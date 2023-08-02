@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
-import {ICircuitBreaker} from "../interfaces/ICircuitBreaker.sol";
+import {IERC7265CircuitBreaker} from "../interfaces/IERC7265CircuitBreaker.sol";
 
 // The ProtectedContract that uses a circuitBreaker for enforcing the circuit breaker
 contract ProtectedContract {
@@ -11,11 +11,11 @@ contract ProtectedContract {
     using SafeERC20 for IERC20;
 
     // The circuitBreaker used by this contract
-    ICircuitBreaker public circuitBreaker;
+    IERC7265CircuitBreaker public circuitBreaker;
 
     // Initialize the contract with a circuitBreaker
     constructor(address _circuitBreaker) {
-        circuitBreaker = ICircuitBreaker(_circuitBreaker);
+        circuitBreaker = IERC7265CircuitBreaker(_circuitBreaker);
     }
 
     // Internal function to be used when tokens are deposited
