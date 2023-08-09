@@ -22,7 +22,7 @@ library LimiterLib {
         if (minLiqRetainedBps == 0 || minLiqRetainedBps > BPS_DENOMINATOR) {
             revert InvalidMinimumLiquidityThreshold();
         }
-        if (initialized(limiter)) revert LimiterAlreadyInitialized();
+        if (isInitialized(limiter)) revert LimiterAlreadyInitialized();
         limiter.minLiqRetainedBps = minLiqRetainedBps;
         limiter.limitBeginThreshold = limitBeginThreshold;
     }
@@ -31,7 +31,7 @@ library LimiterLib {
         if (minLiqRetainedBps == 0 || minLiqRetainedBps > BPS_DENOMINATOR) {
             revert InvalidMinimumLiquidityThreshold();
         }
-        if (!initialized(limiter)) revert LimiterNotInitialized();
+        if (!isInitialized(limiter)) revert LimiterNotInitialized();
         limiter.minLiqRetainedBps = minLiqRetainedBps;
         limiter.limitBeginThreshold = limitBeginThreshold;
     }
@@ -40,7 +40,7 @@ library LimiterLib {
         internal
     {
         // If token does not have a rate limit, do nothing
-        if (!initialized(limiter)) {
+        if (!isInitialized(limiter)) {
             return;
         }
 
@@ -109,7 +109,7 @@ library LimiterLib {
     }
 
     function status(Limiter storage limiter) internal view returns (LimitStatus) {
-        if (!initialized(limiter)) {
+        if (!isInitialized(limiter)) {
             return LimitStatus.Uninitialized;
         }
         int256 currentLiq = limiter.liqTotal;
@@ -126,7 +126,7 @@ library LimiterLib {
         return futureLiq < minLiq ? LimitStatus.Triggered : LimitStatus.Ok;
     }
 
-    function initialized(Limiter storage limiter) internal view returns (bool) {
+    function isInitialized(Limiter storage limiter) internal view returns (bool) {
         return limiter.minLiqRetainedBps > 0;
     }
 
