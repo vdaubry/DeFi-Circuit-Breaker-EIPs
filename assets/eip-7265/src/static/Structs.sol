@@ -5,6 +5,7 @@ struct LiqChangeNode {
     uint256 nextTimestamp;
     int256 amount;
 }
+import {ISettlementModule} from "../interfaces/ISettlementModule.sol";
 
 struct Limiter {
     uint256 minLiqRetainedBps;
@@ -14,4 +15,5 @@ struct Limiter {
     uint256 listHead;
     uint256 listTail;
     mapping(uint256 tick => LiqChangeNode node) listNodes;
+    ISettlementModule settlementModule;
 }

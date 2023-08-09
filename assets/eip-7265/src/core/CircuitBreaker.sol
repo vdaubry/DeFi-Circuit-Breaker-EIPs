@@ -20,7 +20,8 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
     ////////////////////////////////////////////////////////////////
 
     mapping(bytes32 identifier => Limiter limiter) public limiters;
-    mapping(address _contract => bool protectionActive) public isProtectedContract;
+    mapping(address _contract => bool protectionActive)
+        public isProtectedContract;
 
     uint256 public immutable WITHDRAWAL_PERIOD;
 
@@ -41,7 +42,8 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
     ////////////////////////////////////////////////////////////////
 
     modifier onlyProtected() {
-        if (!isProtectedContract[msg.sender]) revert CirtcuitBreaker__NotAProtectedContract();
+        if (!isProtectedContract[msg.sender])
+            revert CirtcuitBreaker__NotAProtectedContract();
         _;
     }
 
@@ -68,29 +70,47 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
     /// @dev OWNER FUNCTIONS
 
     /// @inheritdoc IERC7265CircuitBreaker
-    function addProtectedContracts(address[] calldata _ProtectedContracts) external override onlyOwner {
+    function addProtectedContracts(
+        address[] calldata _ProtectedContracts
+    ) external override onlyOwner {
         for (uint256 i = 0; i < _ProtectedContracts.length; i++) {
             isProtectedContract[_ProtectedContracts[i]] = true;
         }
     }
 
     /// @inheritdoc IERC7265CircuitBreaker
-    function removeProtectedContracts(address[] calldata _ProtectedContracts) external override onlyOwner {
+    function removeProtectedContracts(
+        address[] calldata _ProtectedContracts
+    ) external override onlyOwner {
         for (uint256 i = 0; i < _ProtectedContracts.length; i++) {
             isProtectedContract[_ProtectedContracts[i]] = false;
         }
     }
 
     /// @inheritdoc IERC7265CircuitBreaker
-    function addSecurityParamter(bytes32 identifier, uint256 minLiqRetainedBps, uint256 limitBeginThreshold) external override onlyOwner {
+    function addSecurityParamter(
+        bytes32 identifier,
+        uint256 minLiqRetainedBps,
+        uint256 limitBeginThreshold,
+        ISettlementModule settlementModule
+    ) external override onlyOwner {
         Limiter storage limiter = limiters[identifier];
-        limiter.init(minLiqRetainedBps, limitBeginThreshold);
+        limiter.init(minLiqRetainedBps, limitBeginThreshold, settlementModule);
     }
 
     /// @inheritdoc IERC7265CircuitBreaker
-    function updateSecurityParameter(bytes32 identifier, uint256 minLiqRetainedBps, uint256 limitBeginThreshold) external override onlyOwner {
+    function updateSecurityParameter(
+        bytes32 identifier,
+        uint256 minLiqRetainedBps,
+        uint256 limitBeginThreshold,
+        ISettlementModule settlementModule
+    ) external override onlyOwner {
         Limiter storage limiter = limiters[identifier];
-        limiter.updateParams(minLiqRetainedBps, limitBeginThreshold);
+        limiter.updateParams(
+            minLiqRetainedBps,
+            limitBeginThreshold,
+            settlementModule
+        );
         limiter.sync(WITHDRAWAL_PERIOD);
     }
 
@@ -100,7 +120,10 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
     }
 
     /// @inheritdoc IERC7265CircuitBreaker
-    function setParameter(bytes32 identifier, uint256 newParameter, bool revertOnRateLimit) external returns(bool) {
+    function setParameter(
+        bytes32 identifier,
+        uint256 newParameter,
+    ) external returns (bool) {
         Limiter storage limiter = limiters[identifier];
         if (!limiter.isInitialized()) {
             return false;
@@ -112,32 +135,33 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
     }
 
     /// @inheritdoc IERC7265CircuitBreaker
-    function increaseParameter(bytes32 identifier, uint256 amount, bool revertOnRateLimit) external override onlyProtected onlyOperational returns(bool) {
+    function increaseParameter(
+        bytes32 identifier,
+        uint256 amount
+    ) external override onlyProtected onlyOperational returns (bool) {
         return _increaseParameter(identifier, amount, revertOnRateLimit);
     }
 
     /// @inheritdoc IERC7265CircuitBreaker
     function decreaseParameter(
         bytes32 identifier,
-        uint256 amount,
-        bool revertOnRateLimit
-    ) external override onlyProtected onlyOperational returns(bool) {
+        uint256 amount
+    ) external override onlyProtected onlyOperational returns (bool) {
         return _decreaseParameter(identifier, amount, revertOnRateLimit);
     }
 
     /// @dev INTERNAL FUNCTIONS
 
-    function _increaseParameter(bytes32 identifier, uint256 amount, bool revertOnRateLimit) internal returns(bool) {
+    function _increaseParameter(
+        bytes32 identifier,
+        uint256 amount
+    ) internal returns (bool) {
         /// @dev uint256 could overflow into negative
         Limiter storage limiter = limiters[identifier];
 
         emit ParameterInrease(amount, identifier);
         limiter.recordChange(int256(amount), WITHDRAWAL_PERIOD, TICK_LENGTH);
         if (limiter.status() == LimitStatus.Triggered) {
-            if (revertOnRateLimit) {
-                revert CircuitBreaker__RateLimited();
-            }
-            
             emit RateLimited(identifier);
 
             return true;
@@ -147,16 +171,15 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
 
     function _decreaseParameter(
         bytes32 identifier,
-        uint256 amount,
-        bool revertOnRateLimit
-    ) internal returns(bool) {
+        uint256 amount
+    ) internal returns (bool) {
         Limiter storage limiter = limiters[identifier];
         // Check if the token has enforced rate limited
         if (!limiter.isInitialized()) {
             // if it is not rate limited, just return false
             return false;
         }
-        
+
         emit ParameterDecrease(amount, identifier);
         limiter.recordChange(-int256(amount), WITHDRAWAL_PERIOD, TICK_LENGTH);
 
@@ -164,9 +187,6 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         if (limiter.status() == LimitStatus.Triggered) {
             emit RateLimited(identifier);
 
-            if (revertOnRateLimit) {
-                revert CircuitBreaker__RateLimited();
-            }
             return true;
         }
         return false;
