@@ -139,7 +139,7 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         bytes32 identifier,
         uint256 amount
     ) external override onlyProtected onlyOperational returns (bool) {
-        return _increaseParameter(identifier, amount, revertOnRateLimit);
+        return _increaseParameter(identifier, amount);
     }
 
     /// @inheritdoc IERC7265CircuitBreaker
@@ -147,7 +147,7 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         bytes32 identifier,
         uint256 amount
     ) external override onlyProtected onlyOperational returns (bool) {
-        return _decreaseParameter(identifier, amount, revertOnRateLimit);
+        return _decreaseParameter(identifier, amount);
     }
 
     /// @dev INTERNAL FUNCTIONS
@@ -162,6 +162,10 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         emit ParameterInrease(amount, identifier);
         limiter.recordChange(int256(amount), WITHDRAWAL_PERIOD, TICK_LENGTH);
         if (limiter.status() == LimitStatus.Triggered) {
+
+            // Need to discuss on_tokenOutflow refactor
+            limiter.settlementModule.prevent(_recipient, _amount, innerPayload);
+
             emit RateLimited(identifier);
 
             return true;
