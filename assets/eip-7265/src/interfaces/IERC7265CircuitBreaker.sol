@@ -57,6 +57,16 @@ interface IERC7265CircuitBreaker {
     function decreaseParameter(bytes32 identifier, uint256 amount, bool revertOnRateLimit) external returns(bool);
 
     /**
+     * @dev MAY be called by admin to configure a security parameter
+     */
+    function addSecurityParamter(bytes32 identifier, uint256 minLiqRetainedBps, uint256 limitBeginThreshold) external;
+
+    /**
+     * @dev MAY be called by admin to update configuration of a security parameter
+     */
+    function updateSecurityParameter(bytes32 identifier, uint256 minLiqRetainedBps, uint256 limitBeginThreshold) external;
+
+    /**
      * @dev MAY be called by admin to add protected contracts
      */
     function addProtectedContracts(address[] calldata _protectedContracts) external;

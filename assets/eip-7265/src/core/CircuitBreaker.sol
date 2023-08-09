@@ -67,16 +67,31 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
 
     /// @dev OWNER FUNCTIONS
 
+    /// @inheritdoc IERC7265CircuitBreaker
     function addProtectedContracts(address[] calldata _ProtectedContracts) external override onlyOwner {
         for (uint256 i = 0; i < _ProtectedContracts.length; i++) {
             isProtectedContract[_ProtectedContracts[i]] = true;
         }
     }
 
+    /// @inheritdoc IERC7265CircuitBreaker
     function removeProtectedContracts(address[] calldata _ProtectedContracts) external override onlyOwner {
         for (uint256 i = 0; i < _ProtectedContracts.length; i++) {
             isProtectedContract[_ProtectedContracts[i]] = false;
         }
+    }
+
+    /// @inheritdoc IERC7265CircuitBreaker
+    function addSecurityParamter(bytes32 identifier, uint256 minLiqRetainedBps, uint256 limitBeginThreshold) external override onlyOwner {
+        Limiter storage limiter = limiters[identifier];
+        limiter.init(minLiqRetainedBps, limitBeginThreshold);
+    }
+
+    /// @inheritdoc IERC7265CircuitBreaker
+    function updateSecurityParameter(bytes32 identifier, uint256 minLiqRetainedBps, uint256 limitBeginThreshold) external override onlyOwner {
+        Limiter storage limiter = limiters[identifier];
+        limiter.updateParams(minLiqRetainedBps, limitBeginThreshold);
+        limiter.sync(WITHDRAWAL_PERIOD);
     }
 
     /// @dev function pauses the protocol and prevents any further deposits, withdrawals
