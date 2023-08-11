@@ -36,7 +36,13 @@ interface IERC7265CircuitBreaker {
      * // revertOnRateLimit
      * The function MUST emit the {ParameterSet} event
      */
-    function setParameter(bytes32 identifier, uint256 newParameter, bool revertOnRateLimit) external returns(bool);
+    function setParameter(
+        bytes32 identifier,
+        uint256 newParameter,
+        address settlementTarget,
+        uint256 settlementValue,
+        bytes memory settlementPayload
+    ) external returns (bool);
 
     /**
      * @notice Function for increasing the current security parameter
@@ -45,7 +51,13 @@ interface IERC7265CircuitBreaker {
      * // revertOnRateLimit
      * The function MUST emit the {ParameterSet} event
      */
-    function increaseParameter(bytes32 identifier, uint256 amount, bool revertOnRateLimit) external returns(bool);
+    function increaseParameter(
+        bytes32 identifier,
+        uint256 amount,
+        address settlementTarget,
+        uint256 settlementValue,
+        bytes memory settlementPayload
+    ) external returns (bool);
 
     /**
      * @notice Function for decreasing the current security parameter
@@ -54,17 +66,33 @@ interface IERC7265CircuitBreaker {
      * // revertOnRateLimit
      * The function MUST emit the {ParameterSet} event
      */
-    function decreaseParameter(bytes32 identifier, uint256 amount, bool revertOnRateLimit) external returns(bool);
+    function decreaseParameter(
+        bytes32 identifier,
+        uint256 amount,
+        address settlementTarget,
+        uint256 settlementValue,
+        bytes memory settlementPayload
+    ) external returns (bool);
 
     /**
      * @dev MAY be called by admin to configure a security parameter
      */
-    function addSecurityParamter(bytes32 identifier, uint256 minLiqRetainedBps, uint256 limitBeginThreshold) external;
+    function addSecurityParamter(
+        bytes32 identifier,
+        uint256 minLiqRetainedBps,
+        uint256 limitBeginThreshold,
+        address settlementModule
+    ) external;
 
     /**
      * @dev MAY be called by admin to update configuration of a security parameter
      */
-    function updateSecurityParameter(bytes32 identifier, uint256 minLiqRetainedBps, uint256 limitBeginThreshold) external;
+    function updateSecurityParameter(
+        bytes32 identifier,
+        uint256 minLiqRetainedBps,
+        uint256 limitBeginThreshold,
+        address settlementModule
+    ) external;
 
     /**
      * @dev MAY be called by admin to add protected contracts

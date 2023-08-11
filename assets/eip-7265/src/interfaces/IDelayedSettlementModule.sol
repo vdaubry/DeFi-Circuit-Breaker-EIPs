@@ -20,11 +20,10 @@ interface IDelayedSettlementModule is ISettlementModule {
      * @param innerPayload The calldata for the call.
      * @return newEffectID A unique identifier for the scheduled effect.
      */
-    function prevent(
-        address target,
-        uint256 value,
-        bytes calldata innerPayload
-    ) external payable returns (bytes32 newEffectID);
+    function prevent(address target, uint256 value, bytes calldata innerPayload)
+        external
+        payable
+        returns (bytes32 newEffectID);
 
     /**
      * @notice Executes a settled effect based on the decoded contents in the extendedPayload.

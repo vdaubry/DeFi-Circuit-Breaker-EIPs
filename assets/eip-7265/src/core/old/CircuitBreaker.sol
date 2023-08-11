@@ -64,11 +64,9 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         _;
     }
 
-    constructor(
-        IDelayedSettlementModule _timelock,
-        uint256 _withdrawalPeriod,
-        uint256 _liquidityTickLength
-    ) Ownable() {
+    constructor(IDelayedSettlementModule _timelock, uint256 _withdrawalPeriod, uint256 _liquidityTickLength)
+        Ownable()
+    {
         timelock = _timelock;
         WITHDRAWAL_PERIOD = _withdrawalPeriod;
         TICK_LENGTH = _liquidityTickLength;
@@ -100,12 +98,11 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         _onTokenInflow(_token, _amount);
     }
 
-    function onTokenOutflow(
-        address _token,
-        uint256 _amount,
-        address _recipient,
-        bool _revertOnRateLimit
-    ) external onlyProtected onlyOperational {
+    function onTokenOutflow(address _token, uint256 _amount, address _recipient, bool _revertOnRateLimit)
+        external
+        onlyProtected
+        onlyOperational
+    {
         _onTokenOutflow(_token, _amount, _recipient, _revertOnRateLimit);
     }
 
@@ -113,10 +110,12 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         _onTokenInflow(NATIVE_ADDRESS_PROXY, _amount);
     }
 
-    function onNativeAssetOutflow(
-        address _recipient,
-        bool _revertOnRateLimit
-    ) external payable onlyProtected onlyOperational {
+    function onNativeAssetOutflow(address _recipient, bool _revertOnRateLimit)
+        external
+        payable
+        onlyProtected
+        onlyOperational
+    {
         _onTokenOutflow(NATIVE_ADDRESS_PROXY, msg.value, _recipient, _revertOnRateLimit);
     }
 
@@ -130,12 +129,7 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         emit AssetDeposit(_token, msg.sender, _amount);
     }
 
-    function _onTokenOutflow(
-        address _token,
-        uint256 _amount,
-        address _recipient,
-        bool _revertOnRateLimit
-    ) internal {
+    function _onTokenOutflow(address _token, uint256 _amount, address _recipient, bool _revertOnRateLimit) internal {
         Limiter storage limiter = tokenLimiters[_token];
         // Check if the token has enforced rate limited
         if (!limiter.initialized()) {
@@ -150,7 +144,7 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
             if (_revertOnRateLimit) {
                 revert CircuitBreaker__RateLimited();
             }
-            
+
             // lock funds to DSM here
             _safeTransferIncludingNative(_token, address(timelock), _amount);
 
@@ -164,13 +158,9 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         emit AssetWithdraw(_token, _recipient, _amount);
     }
 
-    function _safeTransferIncludingNative(
-        address _token,
-        address _recipient,
-        uint256 _amount
-    ) internal {
+    function _safeTransferIncludingNative(address _token, address _recipient, uint256 _amount) internal {
         if (_token == NATIVE_ADDRESS_PROXY) {
-            (bool success, ) = _recipient.call{value: _amount}("");
+            (bool success,) = _recipient.call{value: _amount}("");
             if (!success) revert CirtcuitBreaker__NativeTransferFailed();
         } else {
             IERC20(_token).safeTransfer(_recipient, _amount);
@@ -179,7 +169,7 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
 
     /// @dev ERC173 OVERRIDES
 
-    function owner() public view override(IERC173, Ownable) returns(address) {
+    function owner() public view override(IERC173, Ownable) returns (address) {
         super.owner();
     }
 

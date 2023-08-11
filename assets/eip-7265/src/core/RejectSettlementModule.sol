@@ -2,7 +2,6 @@
 pragma solidity 0.8.19;
 
 import "../interfaces/IRejectSettlementModule.sol";
-import {TimelockController} from "openzeppelin-contracts/contracts/governance/TimelockController.sol";
 
 /**
  * @title DelayedSettlementModule: a timelock to schedule transactions
@@ -13,11 +12,12 @@ contract RejectSettlementModule is IRejectSettlementModule {
 
     constructor() {}
 
-    function prevent(
-        address target,
-        uint256 value,
-        bytes calldata innerPayload
-    ) external payable override returns (bytes32 newEffectID) {
+    function prevent(address target, uint256 value, bytes calldata innerPayload)
+        external
+        payable
+        override
+        returns (bytes32 newEffectID)
+    {
         //Does it make sense to have a unique identifier for the scheduled effect since we revert ?
         newEffectID = keccak256(abi.encode(target, value, innerPayload));
         return newEffectID;
@@ -25,10 +25,8 @@ contract RejectSettlementModule is IRejectSettlementModule {
     }
 
     function execute(bytes calldata extendedPayload) external override {
-        (address target, uint256 value, bytes memory innerPayload) = abi.decode(
-            extendedPayload,
-            (address, uint256, bytes)
-        );
+        (address target, uint256 value, bytes memory innerPayload) =
+            abi.decode(extendedPayload, (address, uint256, bytes));
         revert cannotExecuteRejectedTransation();
     }
 }

@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
-import {IERC7265CircuitBreaker} from "../interfaces/IERC7265CircuitBreaker.sol";
+import {ITokenCircuitBreaker} from "../interfaces/ITokenCircuitBreaker.sol";
 
 // The ProtectedContract that uses a circuitBreaker for enforcing the circuit breaker
 contract ProtectedContract {
@@ -11,11 +11,11 @@ contract ProtectedContract {
     using SafeERC20 for IERC20;
 
     // The circuitBreaker used by this contract
-    IERC7265CircuitBreaker public circuitBreaker;
+    ITokenCircuitBreaker public circuitBreaker;
 
     // Initialize the contract with a circuitBreaker
     constructor(address _circuitBreaker) {
-        circuitBreaker = IERC7265CircuitBreaker(_circuitBreaker);
+        circuitBreaker = ITokenCircuitBreaker(_circuitBreaker);
     }
 
     // Internal function to be used when tokens are deposited
@@ -29,13 +29,13 @@ contract ProtectedContract {
 
     // Internal function to be used when tokens are withdrawn
     // Transfers the tokens to the circuitBreaker and then calls the circuitBreaker's onTokenOutflow
-    function cbOutflowSafeTransfer(address _token, address _recipient, uint256 _amount, bool _revertOnRateLimit)
+    function cbOutflowSafeTransfer(address _token, address _recipient, uint256 _amount)
         internal
     {
         // Transfer the tokens safely to the circuitBreaker
         IERC20(_token).safeTransfer(address(circuitBreaker), _amount);
         // Call the circuitBreaker's onTokenOutflow
-        circuitBreaker.onTokenOutflow(_token, _amount, _recipient, _revertOnRateLimit);
+        circuitBreaker.onTokenOutflow(_token, _amount, _recipient);
     }
 
     function cbInflowNative() internal {
@@ -43,8 +43,8 @@ contract ProtectedContract {
         circuitBreaker.onNativeAssetInflow(msg.value);
     }
 
-    function cbOutflowNative(address _recipient, uint256 _amount, bool _revertOnRateLimit) internal {
+    function cbOutflowNative(address _recipient, uint256 _amount) internal {
         // Transfer the native tokens safely through the circuitBreaker
-        circuitBreaker.onNativeAssetOutflow{value: _amount}(_recipient, _revertOnRateLimit);
+        circuitBreaker.onNativeAssetOutflow{value: _amount}(_recipient);
     }
 }
