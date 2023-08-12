@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: CC0-1.0
 pragma solidity 0.8.19;
 
+import {Limiter} from "../static/Structs.sol";
+
 /// @title Circuit Breaker
 /// @dev See https://eips.ethereum.org/EIPS/eip-7265
 interface IERC7265CircuitBreaker {
@@ -77,7 +79,7 @@ interface IERC7265CircuitBreaker {
     /**
      * @dev MAY be called by admin to configure a security parameter
      */
-    function addSecurityParamter(
+    function addSecurityParameter(
         bytes32 identifier,
         uint256 minLiqRetainedBps,
         uint256 limitBeginThreshold,
@@ -93,6 +95,8 @@ interface IERC7265CircuitBreaker {
         uint256 limitBeginThreshold,
         address settlementModule
     ) external;
+
+    function isRateLimited(bytes32 identifier) external view returns (bool);
 
     /**
      * @dev MAY be called by admin to add protected contracts

@@ -22,6 +22,14 @@ interface ITokenCircuitBreaker is IERC7265CircuitBreaker {
     /// @param amount MUST be the amount of assets being withdrawn
     event AssetWithdraw(address indexed asset, address indexed recipient, uint256 amount);
 
+    /// @dev MUST be emitted in `registerAsset` when an asset is registered
+    /// @param asset MUST be the address of the asset for which to set rate limit parameters. 
+    /// For any EIP-20 token, MUST be an EIP-20 token contract.
+    /// For the native asset (ETH on mainnet), MUST be address 0x0000000000000000000000000000000000000001 equivalent to address(1).
+    /// @param metricThreshold The threshold metric which defines when a rate limit is triggered
+    /// @param minAmountToLimit The minimum amount of nominal asset liquidity at which point rate limits can be triggered
+    event AssetRegistered(address indexed asset, uint256 metricThreshold, uint256 minAmountToLimit);
+
     /// @notice Record EIP-20 token inflow into a protected contract
     /// @dev This method MUST be called from all protected contract methods where an EIP-20 token is transferred in from a user.
     /// MUST revert if caller is not a protected contract.
@@ -62,4 +70,51 @@ interface ITokenCircuitBreaker is IERC7265CircuitBreaker {
     /// If a rate limit is triggered and the circuit breaker is not in grace period, this method MUST record the locked funds in the internal accounting of the circuit breaker implementation.
     /// @param _recipient MUST be the address of the recipient of the transferred native asset from the protected contract
     function onNativeAssetOutflow(address _recipient) external payable;
+
+    /// @notice Register rate limit parameters for a given asset
+    /// @dev Each asset that will be rate limited MUST be registered using this function, including the native asset (ETH on mainnet). 
+    /// If an asset is not registered, it will not be subject to rate limiting or circuit breaking and unlimited immediate withdrawals MUST be allowed.
+    /// MUST revert if the caller is not the current admin.
+    /// MUST revert if the asset has already been registered.
+    /// @param _asset The address of the asset for which to set rate limit parameters. 
+    /// To set the rate limit parameters for any EIP-20 token, MUST be an EIP-20 token contract.
+    /// To set rate limit parameters For the native asset, MUST be address 0x0000000000000000000000000000000000000001 equivalent to address(1).
+    /// @param _minLiqRetainedBps The threshold metric which defines when a rate limit is triggered. 
+    /// This is intentionally left open to allow for various implementations, including percentage-based (see reference implementation), nominal, and more.
+    /// MUST be greater than 0.
+    /// @param _limitBeginThreshold The minimum amount of nominal asset liquidity at which point rate limits can be triggered. 
+    /// This limits potential false positives triggered either by minor assets with low liquidity or by low liquidity during early stages of protocol launch.
+    /// Below this amount, withdrawals of this asset MUST NOT trigger a rate limit.
+    /// However, if a rate limit is triggered, assets below the minimum trigger amount to limit MUST still be locked.
+    /// @param _settlementModule The address of the settlement module for this asset.
+    function registerAsset(
+        address _asset,
+        uint256 _minLiqRetainedBps,
+        uint256 _limitBeginThreshold,
+        address _settlementModule
+    ) external;
+
+    /// @notice Modify rate limit parameters for a given asset 
+    /// @dev MAY be used only after registering an asset.
+    /// MUST revert if asset is not previously registered with the `registerAsset` method.
+    /// MUST revert if the caller is not the current admin.
+    /// @param _asset The address of the asset contract for which to set rate limit parameters. 
+    /// To update the rate limit parameters for any EIP-20 token, MUST be an EIP-20 token contract.
+    /// To update the rate limit parameters For the native asset (ETH on mainnet), MUST be address 0x0000000000000000000000000000000000000001 equivalent to address(1).
+    /// @param _minLiqRetainedBps The threshold metric which defines when a rate limit is triggered. 
+    /// This is left open to allow for various implementations, including percentage-based (see reference implementation), nominal, and more.
+    /// MUST be greater than 0.
+    /// @param _limitBeginThreshold The minimum amount of nominal asset liquidity at which point rate limits can be triggered. 
+    /// This limits potential false positives caused both by minor assets with low liquidity and by low liquidity during early stages of protocol launch.
+    /// Below this amount, withdrawals of this asset MUST NOT trigger a rate limit.
+    /// However, if a rate limit is triggered, assets below the minimum amount to limit MUST still be locked.
+    /// @param _settlementModule The address of the settlement module for this asset.
+    function updateAssetParams(
+        address _asset,
+        uint256 _minLiqRetainedBps,
+        uint256 _limitBeginThreshold,
+        address _settlementModule
+    ) external;
+
+    function isTokenRateLimited(address token) external view returns (bool);
 }

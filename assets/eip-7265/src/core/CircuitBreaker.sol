@@ -32,8 +32,8 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
     //                           ERRORS                           //
     ////////////////////////////////////////////////////////////////
 
-    error CirtcuitBreaker__NotAProtectedContract();
-    error CirtcuitBreaker__NotOperational();
+    error CircuitBreaker__NotAProtectedContract();
+    error CircuitBreaker__NotOperational();
     error CircuitBreaker__RateLimited();
 
     ////////////////////////////////////////////////////////////////
@@ -42,7 +42,7 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
 
     modifier onlyProtected() {
         if (!isProtectedContract[msg.sender]) {
-            revert CirtcuitBreaker__NotAProtectedContract();
+            revert CircuitBreaker__NotAProtectedContract();
         }
         _;
     }
@@ -55,7 +55,7 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
      * (Social Consensus)
      */
     modifier onlyOperational() {
-        if (!isOperational) revert CirtcuitBreaker__NotOperational();
+        if (!isOperational) revert CircuitBreaker__NotOperational();
         _;
     }
 
@@ -81,14 +81,13 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
     }
 
     /// @inheritdoc IERC7265CircuitBreaker
-    function addSecurityParamter(
+    function addSecurityParameter(
         bytes32 identifier,
         uint256 minLiqRetainedBps,
         uint256 limitBeginThreshold,
         address settlementModule
     ) external override onlyOwner {
-        Limiter storage limiter = limiters[identifier];
-        limiter.init(minLiqRetainedBps, limitBeginThreshold, ISettlementModule(settlementModule));
+        _addSecurityParameter(identifier, minLiqRetainedBps, limitBeginThreshold, settlementModule);
     }
 
     /// @inheritdoc IERC7265CircuitBreaker
@@ -98,9 +97,7 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         uint256 limitBeginThreshold,
         address settlementModule
     ) external override onlyOwner {
-        Limiter storage limiter = limiters[identifier];
-        limiter.updateParams(minLiqRetainedBps, limitBeginThreshold, ISettlementModule(settlementModule));
-        limiter.sync(WITHDRAWAL_PERIOD);
+        _updateSecurityParameter(identifier, minLiqRetainedBps, limitBeginThreshold, settlementModule);
     }
 
     /// @dev function pauses the protocol and prevents any further deposits, withdrawals
@@ -133,7 +130,7 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         address settlementTarget,
         uint256 settlementValue,
         bytes memory settlementPayload
-    ) external override onlyProtected onlyOperational returns (bool) {
+    ) external override returns (bool) {
         return _increaseParameter(identifier, amount, settlementTarget, settlementValue, settlementPayload);
     }
 
@@ -144,11 +141,54 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         address settlementTarget,
         uint256 settlementValue,
         bytes memory settlementPayload
-    ) external override onlyProtected onlyOperational returns (bool) {
+    ) external override returns (bool) {
         return _decreaseParameter(identifier, amount, settlementTarget, settlementValue, settlementPayload);
     }
 
+    function isRateLimited(bytes32 identifier) external view returns (bool) {
+        return limiters[identifier].status() == LimitStatus.Triggered;
+    }
+
+    function liquidityChanges(
+        bytes32 identifier,
+        uint256 _tickTimestamp
+    ) external view returns (uint256 nextTimestamp, int256 amount) {
+        LiqChangeNode storage node = limiters[identifier].listNodes[_tickTimestamp];
+        nextTimestamp = node.nextTimestamp;
+        amount = node.amount;
+    }
+
+    /**
+     * @dev Due to potential inactivity, the linked list may grow to where
+     * it is better to clear the backlog in advance to save gas for the users
+     * this is a public function so that anyone can call it as it is not user sensitive
+     */
+    function clearBackLog(bytes32 identifier, uint256 _maxIterations) external {
+        limiters[identifier].sync(WITHDRAWAL_PERIOD, _maxIterations);
+    }
+
     /// @dev INTERNAL FUNCTIONS
+
+    function _addSecurityParameter(
+        bytes32 identifier,
+        uint256 minLiqRetainedBps,
+        uint256 limitBeginThreshold,
+        address settlementModule
+    ) internal {
+        Limiter storage limiter = limiters[identifier];
+        limiter.init(minLiqRetainedBps, limitBeginThreshold, ISettlementModule(settlementModule));
+    }
+
+    function _updateSecurityParameter(
+        bytes32 identifier,
+        uint256 minLiqRetainedBps,
+        uint256 limitBeginThreshold,
+        address settlementModule
+    ) internal {
+        Limiter storage limiter = limiters[identifier];
+        limiter.updateParams(minLiqRetainedBps, limitBeginThreshold, ISettlementModule(settlementModule));
+        limiter.sync(WITHDRAWAL_PERIOD);
+    }
 
     function _increaseParameter(
         bytes32 identifier,
@@ -156,7 +196,7 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         address settlementTarget,
         uint256 settlementValue,
         bytes memory settlementPayload
-    ) internal returns (bool) {
+    ) internal onlyProtected onlyOperational returns (bool) {
         /// @dev uint256 could overflow into negative
         Limiter storage limiter = limiters[identifier];
 
@@ -164,7 +204,7 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         limiter.recordChange(int256(amount), WITHDRAWAL_PERIOD, TICK_LENGTH);
         if (limiter.status() == LimitStatus.Triggered) {
             emit RateLimited(identifier);
-            limiter.settlementModule.prevent(settlementTarget, settlementValue, settlementPayload);
+            _onFirewallTrigger(limiter, settlementTarget, settlementValue, settlementPayload);
             return true;
         }
         return false;
@@ -176,7 +216,7 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         address settlementTarget,
         uint256 settlementValue,
         bytes memory settlementPayload
-    ) internal returns (bool) {
+    ) internal onlyProtected onlyOperational returns (bool) {
         Limiter storage limiter = limiters[identifier];
         // Check if the token has enforced rate limited
         if (!limiter.isInitialized()) {
@@ -190,9 +230,18 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         // Check if rate limit is triggered after withdrawal
         if (limiter.status() == LimitStatus.Triggered) {
             emit RateLimited(identifier);
-            limiter.settlementModule.prevent(settlementTarget, settlementValue, settlementPayload);
+            _onFirewallTrigger(limiter, settlementTarget, settlementValue, settlementPayload);
             return true;
         }
         return false;
+    }
+
+    function _onFirewallTrigger(
+        Limiter storage limiter,
+        address settlementTarget,
+        uint256 settlementValue,
+        bytes memory settlementPayload
+    ) internal virtual {
+        limiter.settlementModule.prevent(settlementTarget, settlementValue, settlementPayload);
     }
 }

@@ -29,9 +29,7 @@ contract ProtectedContract {
 
     // Internal function to be used when tokens are withdrawn
     // Transfers the tokens to the circuitBreaker and then calls the circuitBreaker's onTokenOutflow
-    function cbOutflowSafeTransfer(address _token, address _recipient, uint256 _amount)
-        internal
-    {
+    function cbOutflowSafeTransfer(address _token, address _recipient, uint256 _amount) internal {
         // Transfer the tokens safely to the circuitBreaker
         IERC20(_token).safeTransfer(address(circuitBreaker), _amount);
         // Call the circuitBreaker's onTokenOutflow
