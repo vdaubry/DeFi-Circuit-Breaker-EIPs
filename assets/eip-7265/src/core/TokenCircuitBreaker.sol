@@ -20,11 +20,18 @@ contract TokenCircuitBreaker is CircuitBreaker, ITokenCircuitBreaker {
         emit AssetDeposit(_token, msg.sender, _amount);
     }
 
+    // @dev Funds have been transferred to the circuit breaker before calling onTokenOutflow
     function onTokenOutflow(address _token, uint256 _amount, address _recipient) external override onlyOperational {
         // compute calldata to call the erc20 contract and transfer funds to _recipient
         bytes memory data = abi.encodeWithSelector(bytes4(keccak256("transfer(address,uint256)")), _recipient, _amount);
 
-        _decreaseParameter(keccak256(abi.encode(_token)), _amount, _token, 0, data);
+        bool firewallTriggered = _decreaseParameter(keccak256(abi.encode(_token)), _amount, _token, 0, data);
+        if (firewallTriggered) {
+            
+        }
+        else {
+            // Perform transfert of ERC20
+        }
         emit AssetDeposit(_token, msg.sender, _amount);
     }
 
@@ -37,4 +44,12 @@ contract TokenCircuitBreaker is CircuitBreaker, ITokenCircuitBreaker {
         _decreaseParameter(keccak256(abi.encode(address(0))), msg.value, _recipient, msg.value, new bytes(0));
         emit AssetDeposit(address(0), msg.sender, msg.value);
     }
+
+     function _onFirewallTriggered() internal {
+        // transfer tokens to the timelock
+
+        // Need to discuss on_tokenOutflow refactor
+        super()
+    }
+
 }
