@@ -20,6 +20,8 @@ contract TokenCircuitBreaker is CircuitBreaker, ITokenCircuitBreaker {
 
     error TokenCirtcuitBreaker__NativeTransferFailed();
 
+    uint8 private constant FUNCTION_SELECTOR_SIZE = 4;
+
     // Using address(1) as a proxy for native token (ETH, BNB, etc), address(0) could be problematic
     address public immutable NATIVE_ADDRESS_PROXY = address(1);
 
@@ -99,9 +101,11 @@ contract TokenCircuitBreaker is CircuitBreaker, ITokenCircuitBreaker {
         // use the data to call _safeTransferIncludingNative
 
         if (settlementPayload.length > 0) {
-            bytes memory dataWithoutSelector = new bytes(settlementPayload.length - 4);
+            // decoding the calldata
+            // extracting the function selector (which is always bytes4) from the bytes calldata, in order to properly decode the calldata
+            bytes memory dataWithoutSelector = new bytes(settlementPayload.length - FUNCTION_SELECTOR_SIZE);
             for (uint i = 0; i < dataWithoutSelector.length; i++) {
-                dataWithoutSelector[i] = settlementPayload[i + 4];
+                dataWithoutSelector[i] = settlementPayload[i + FUNCTION_SELECTOR_SIZE];
             }
             (, uint256 amount) = abi.decode(dataWithoutSelector, (address, uint256));
 
