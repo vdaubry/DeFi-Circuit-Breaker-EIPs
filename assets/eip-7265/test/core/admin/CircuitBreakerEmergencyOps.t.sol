@@ -92,7 +92,7 @@ contract CircuitBreakerEmergencyOpsTest is Test {
 
         // Exploit
         vm.prank(admin);
-        circuitBreaker.setCircuitBreakerOperationalStatus(true);
+        circuitBreaker.setCircuitBreakerOperationalStatus(false);
 
         token.mint(alice, 1_000_000e18);
         vm.prank(alice);
