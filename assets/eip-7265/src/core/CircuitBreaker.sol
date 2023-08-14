@@ -80,6 +80,8 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         }
     }
 
+    /// @dev CORE CIRCUIT BREAKER FUNCTIONS
+
     /// @inheritdoc IERC7265CircuitBreaker
     function addSecurityParameter(
         bytes32 identifier,
@@ -100,27 +102,9 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         _updateSecurityParameter(identifier, minLiqRetainedBps, limitBeginThreshold, settlementModule);
     }
 
-    /// @dev function pauses the protocol and prevents any further deposits, withdrawals
-    function markAsNotOperational() external override onlyOwner {
-        isOperational = false;
-    }
-
     /// @inheritdoc IERC7265CircuitBreaker
-    function setParameter(
-        bytes32 identifier,
-        uint256 newParameter,
-        address settlementTarget,
-        uint256 settlementValue,
-        bytes memory settlementPayload
-    ) external returns (bool) {
-        Limiter storage limiter = limiters[identifier];
-        if (!limiter.isInitialized()) {
-            return false;
-        }
-
-        // TODO: implement (have to change LimiterLib for that)
-
-        return false;
+    function setCircuitBreakerOperationalStatus(bool newOperationalStatus) external override onlyOwner {
+        isOperational = newOperationalStatus;
     }
 
     /// @inheritdoc IERC7265CircuitBreaker
@@ -145,6 +129,17 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         return _decreaseParameter(identifier, amount, settlementTarget, settlementValue, settlementPayload);
     }
 
+    /**
+     * @dev Due to potential inactivity, the linked list may grow to where
+     * it is better to clear the backlog in advance to save gas for the users
+     * this is a public function so that anyone can call it as it is not user sensitive
+     */
+    function clearBackLog(bytes32 identifier, uint256 _maxIterations) external {
+        limiters[identifier].sync(WITHDRAWAL_PERIOD, _maxIterations);
+    }
+
+    /// @dev EXTERNAL VIEW FUNCTIONS
+
     function isRateLimited(bytes32 identifier) external view returns (bool) {
         return limiters[identifier].status() == LimitStatus.Triggered;
     }
@@ -156,15 +151,6 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         LiqChangeNode storage node = limiters[identifier].listNodes[_tickTimestamp];
         nextTimestamp = node.nextTimestamp;
         amount = node.amount;
-    }
-
-    /**
-     * @dev Due to potential inactivity, the linked list may grow to where
-     * it is better to clear the backlog in advance to save gas for the users
-     * this is a public function so that anyone can call it as it is not user sensitive
-     */
-    function clearBackLog(bytes32 identifier, uint256 _maxIterations) external {
-        limiters[identifier].sync(WITHDRAWAL_PERIOD, _maxIterations);
     }
 
     /// @dev INTERNAL FUNCTIONS
@@ -242,6 +228,6 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         uint256 settlementValue,
         bytes memory settlementPayload
     ) internal virtual {
-        limiter.settlementModule.prevent(settlementTarget, settlementValue, settlementPayload);
+        limiter.settlementModule.prevent{value: settlementValue}(settlementTarget, settlementValue, settlementPayload);
     }
 }

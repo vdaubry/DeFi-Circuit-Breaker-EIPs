@@ -19,32 +19,10 @@ interface IERC7265CircuitBreaker {
      */
     event ParameterDecrease(uint256 indexed amount, bytes32 indexed identifier);
     /**
-     * @notice Event emitted whenever the security parameter is directly set to a new value
-     * @param previousParameter The previous value of the security parameter
-     * @param newParameter The new value of the security parameter
-     * @param identifier The identifier of the security parameter
-     */
-    event ParameterSet(uint256 indexed previousParameter, uint256 indexed newParameter, bytes32 indexed identifier);
-    /**
      * @notice Event emitted whenever an interaction is rate limited
      * @param identifier The identifier of the security parameter that triggered the rate limiting
      */
     event RateLimited(bytes32 indexed identifier);
-
-    /**
-     * @notice Function for setting the security parameter to a new value
-     * @dev This function MAY only be called by the owner of the security parameter
-     * // bytes32 identifier
-     * // revertOnRateLimit
-     * The function MUST emit the {ParameterSet} event
-     */
-    function setParameter(
-        bytes32 identifier,
-        uint256 newParameter,
-        address settlementTarget,
-        uint256 settlementValue,
-        bytes memory settlementPayload
-    ) external returns (bool);
 
     /**
      * @notice Function for increasing the current security parameter
@@ -108,8 +86,8 @@ interface IERC7265CircuitBreaker {
      */
     function removeProtectedContracts(address[] calldata _protectedContracts) external;
 
-    /// @notice Lock the circuit breaker
-    /// @dev MAY be called by admin to lock the circuit breaker
+    /// @notice Function for pausing / unpausing the Circuit Breaker
+    /// @dev MAY be called by admin to pause / unpause the Circuit Breaker
     /// While the protocol is not operational: inflows, outflows, and claiming locked funds MUST revert
-    function markAsNotOperational() external;
+    function setCircuitBreakerOperationalStatus(bool newOperationalStatus) external;
 }
