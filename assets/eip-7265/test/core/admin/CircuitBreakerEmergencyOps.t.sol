@@ -32,7 +32,7 @@ contract CircuitBreakerEmergencyOpsTest is Test {
         circuitBreaker = new TokenCircuitBreaker(4 hours, 5 minutes);
         circuitBreaker.transferOwnership(admin);
         delayedSettlementModule = new DelayedSettlementModule(1 seconds, new address[](0), new address[](0), admin);
-        
+
         // allow token circuit breaker to propose (for calling prevent function)
         vm.prank(admin);
         delayedSettlementModule.grantRole(keccak256("PROPOSER_ROLE"), address(circuitBreaker));

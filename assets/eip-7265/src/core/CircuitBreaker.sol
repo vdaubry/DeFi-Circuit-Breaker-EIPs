@@ -144,10 +144,11 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         return limiters[identifier].status() == LimitStatus.Triggered;
     }
 
-    function liquidityChanges(
-        bytes32 identifier,
-        uint256 _tickTimestamp
-    ) external view returns (uint256 nextTimestamp, int256 amount) {
+    function liquidityChanges(bytes32 identifier, uint256 _tickTimestamp)
+        external
+        view
+        returns (uint256 nextTimestamp, int256 amount)
+    {
         LiqChangeNode storage node = limiters[identifier].listNodes[_tickTimestamp];
         nextTimestamp = node.nextTimestamp;
         amount = node.amount;

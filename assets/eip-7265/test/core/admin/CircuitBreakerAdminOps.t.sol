@@ -81,7 +81,6 @@ contract CircuitBreakerAdminOpsTest is Test {
         secondToken = new MockToken("DAI", "DAI");
         bytes32 identifier = keccak256(abi.encodePacked(address(secondToken)));
 
-
         vm.prank(admin);
         circuitBreaker.registerAsset(address(secondToken), 7000, 1000e18, address(delayedSettlementModule));
         (uint256 minLiquidityThreshold, uint256 minAmount,,,,,) = circuitBreaker.limiters(identifier);
