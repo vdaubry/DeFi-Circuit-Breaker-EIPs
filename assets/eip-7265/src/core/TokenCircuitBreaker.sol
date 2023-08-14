@@ -21,6 +21,7 @@ contract TokenCircuitBreaker is CircuitBreaker, ITokenCircuitBreaker {
     error TokenCirtcuitBreaker__NativeTransferFailed();
 
     uint8 private constant FUNCTION_SELECTOR_SIZE = 4;
+    bytes4 private constant TRANSFER_SELECTOR = bytes4(keccak256("transfer(address,uint256)"));
 
     // Using address(1) as a proxy for native token (ETH, BNB, etc), address(0) could be problematic
     address public immutable NATIVE_ADDRESS_PROXY = address(1);
@@ -30,15 +31,14 @@ contract TokenCircuitBreaker is CircuitBreaker, ITokenCircuitBreaker {
     {}
 
     /// @dev OWNABLE FUNCTIONS
-    
+
     function registerAsset(
         address _asset,
         uint256 _minLiqRetainedBps,
         uint256 _limitBeginThreshold,
         address _settlementModule
     ) external override onlyOwner {
-        bytes32 identifier = keccak256(abi.encodePacked(_asset));
-        _addSecurityParameter(identifier, _minLiqRetainedBps, _limitBeginThreshold, _settlementModule);
+        _addSecurityParameter(getTokenIdentifier(_asset), _minLiqRetainedBps, _limitBeginThreshold, _settlementModule);
     }
 
     function updateAssetParams(
@@ -47,48 +47,59 @@ contract TokenCircuitBreaker is CircuitBreaker, ITokenCircuitBreaker {
         uint256 _limitBeginThreshold,
         address _settlementModule
     ) external override onlyOwner {
-        bytes32 identifier = keccak256(abi.encodePacked(_asset));
-        _updateSecurityParameter(identifier, _minLiqRetainedBps, _limitBeginThreshold, _settlementModule);
+        _updateSecurityParameter(
+            getTokenIdentifier(_asset), _minLiqRetainedBps, _limitBeginThreshold, _settlementModule
+        );
     }
 
     /// @dev TOKEN FUNCTIONS
 
-    function onTokenInflow(address _token, uint256 _amount) external override onlyProtected onlyOperational  {
-        _increaseParameter(keccak256(abi.encodePacked(_token)), _amount, _token, 0, new bytes(0));
+    function onTokenInflow(address _token, uint256 _amount) external override onlyProtected onlyOperational {
+        _increaseParameter(getTokenIdentifier(_token), _amount, _token, 0, new bytes(0));
         emit AssetDeposit(_token, msg.sender, _amount);
     }
 
     // @dev Funds have been transferred to the circuit breaker before calling onTokenOutflow
-    function onTokenOutflow(address _token, uint256 _amount, address _recipient) external override onlyProtected onlyOperational  {
+    function onTokenOutflow(address _token, uint256 _amount, address _recipient)
+        external
+        override
+        onlyProtected
+        onlyOperational
+    {
         // compute calldata to call the erc20 contract and transfer funds to _recipient
         bytes memory data = abi.encodeWithSelector(bytes4(keccak256("transfer(address,uint256)")), _recipient, _amount);
-        
-        bool firewallTriggered = _decreaseParameter(keccak256(abi.encodePacked(_token)), _amount, _token, 0, data);
+
+        bool firewallTriggered = _decreaseParameter(getTokenIdentifier(_token), _amount, _token, 0, data);
         if (!firewallTriggered) _safeTransferIncludingNative(_token, _recipient, _amount);
 
         emit AssetDeposit(_token, msg.sender, _amount);
     }
 
     function onNativeAssetInflow(uint256 _amount) external override onlyProtected onlyOperational {
-        _increaseParameter(keccak256(abi.encodePacked(NATIVE_ADDRESS_PROXY)), _amount, address(0), 0, new bytes(0));
+        _increaseParameter(getTokenIdentifier(NATIVE_ADDRESS_PROXY), _amount, address(0), 0, new bytes(0));
         emit AssetDeposit(NATIVE_ADDRESS_PROXY, msg.sender, _amount);
     }
 
-    function onNativeAssetOutflow(address _recipient) external payable override onlyProtected onlyOperational  {
-        bool firewallTriggered = _decreaseParameter(
-            keccak256(abi.encodePacked(NATIVE_ADDRESS_PROXY)), msg.value, _recipient, msg.value, new bytes(0)
-        );
+    function onNativeAssetOutflow(address _recipient) external payable override onlyProtected onlyOperational {
+        bool firewallTriggered =
+            _decreaseParameter(getTokenIdentifier(NATIVE_ADDRESS_PROXY), msg.value, _recipient, msg.value, new bytes(0));
 
         if (!firewallTriggered) _safeTransferIncludingNative(NATIVE_ADDRESS_PROXY, _recipient, msg.value);
 
         emit AssetDeposit(NATIVE_ADDRESS_PROXY, msg.sender, msg.value);
     }
-    
+
     function isTokenRateLimited(address token) external view returns (bool) {
-        return limiters[keccak256(abi.encodePacked(token))].status() == LimitStatus.Triggered;
+        return limiters[getTokenIdentifier(token)].status() == LimitStatus.Triggered;
     }
 
     /// @dev INTERNAL FUNCTIONS
+
+    function getTokenIdentifier(address token) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(token));
+    }
+
+    /// @dev FIREWALL TRIGGER OVERRIDE
 
     function _onFirewallTrigger(
         Limiter storage limiter,
@@ -104,7 +115,7 @@ contract TokenCircuitBreaker is CircuitBreaker, ITokenCircuitBreaker {
             // decoding the calldata
             // extracting the function selector (which is always bytes4) from the bytes calldata, in order to properly decode the calldata
             bytes memory dataWithoutSelector = new bytes(settlementPayload.length - FUNCTION_SELECTOR_SIZE);
-            for (uint i = 0; i < dataWithoutSelector.length; i++) {
+            for (uint256 i = 0; i < dataWithoutSelector.length; i++) {
                 dataWithoutSelector[i] = settlementPayload[i + FUNCTION_SELECTOR_SIZE];
             }
             (, uint256 amount) = abi.decode(dataWithoutSelector, (address, uint256));
