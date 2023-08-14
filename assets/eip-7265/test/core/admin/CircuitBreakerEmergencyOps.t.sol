@@ -74,7 +74,7 @@ contract CircuitBreakerEmergencyOpsTest is Test {
         assertEq(circuitBreaker.isTokenRateLimited(address(secondToken)), false);
     }
 
-    function test_reverts_ifIsExploitedFlagUp() public {
+    function test_reverts_ifIsNotOperational() public {
         token.mint(alice, 1_000_000e18);
 
         vm.prank(alice);
@@ -92,7 +92,7 @@ contract CircuitBreakerEmergencyOpsTest is Test {
 
         // Exploit
         vm.prank(admin);
-        circuitBreaker.markAsNotOperational();
+        circuitBreaker.setCircuitBreakerOperationalStatus(true);
 
         token.mint(alice, 1_000_000e18);
         vm.prank(alice);
