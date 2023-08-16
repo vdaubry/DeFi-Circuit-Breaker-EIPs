@@ -116,5 +116,10 @@ interface ITokenCircuitBreaker is IERC7265CircuitBreaker {
         address _settlementModule
     ) external;
 
+    /**
+     * @notice Function for checking if an asset is rate limited by the CircuitBreaker
+     * @param token is the address of the asset to check
+     * @dev MUST return true if the asset is rate limited by the CircuitBreaker
+     */
     function isTokenRateLimited(address token) external view returns (bool);
 }
