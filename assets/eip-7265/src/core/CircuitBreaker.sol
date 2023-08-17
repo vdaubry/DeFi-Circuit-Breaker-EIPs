@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.19;
+pragma solidity ^0.8.19;
 
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
@@ -20,7 +20,8 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
     ////////////////////////////////////////////////////////////////
 
     mapping(bytes32 identifier => Limiter limiter) public limiters;
-    mapping(address _contract => bool protectionActive) public isProtectedContract;
+    mapping(address _contract => bool protectionActive)
+        public isProtectedContract;
 
     uint256 public immutable WITHDRAWAL_PERIOD;
 
@@ -59,7 +60,11 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         _;
     }
 
-    constructor(uint256 _withdrawalPeriod, uint256 _liquidityTickLength) Ownable() {
+    constructor(
+        uint256 _withdrawalPeriod,
+        uint256 _liquidityTickLength,
+        address _initialOwner
+    ) Ownable(_initialOwner) {
         WITHDRAWAL_PERIOD = _withdrawalPeriod;
         TICK_LENGTH = _liquidityTickLength;
     }
@@ -67,14 +72,18 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
     /// @dev OWNER FUNCTIONS
 
     /// @inheritdoc IERC7265CircuitBreaker
-    function addProtectedContracts(address[] calldata _ProtectedContracts) external override onlyOwner {
+    function addProtectedContracts(
+        address[] calldata _ProtectedContracts
+    ) external override onlyOwner {
         for (uint256 i = 0; i < _ProtectedContracts.length; i++) {
             isProtectedContract[_ProtectedContracts[i]] = true;
         }
     }
 
     /// @inheritdoc IERC7265CircuitBreaker
-    function removeProtectedContracts(address[] calldata _ProtectedContracts) external override onlyOwner {
+    function removeProtectedContracts(
+        address[] calldata _ProtectedContracts
+    ) external override onlyOwner {
         for (uint256 i = 0; i < _ProtectedContracts.length; i++) {
             isProtectedContract[_ProtectedContracts[i]] = false;
         }
@@ -89,7 +98,12 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         uint256 limitBeginThreshold,
         address settlementModule
     ) external override onlyOwner {
-        _addSecurityParameter(identifier, minLiqRetainedBps, limitBeginThreshold, settlementModule);
+        _addSecurityParameter(
+            identifier,
+            minLiqRetainedBps,
+            limitBeginThreshold,
+            settlementModule
+        );
     }
 
     /// @inheritdoc IERC7265CircuitBreaker
@@ -99,11 +113,18 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         uint256 limitBeginThreshold,
         address settlementModule
     ) external override onlyOwner {
-        _updateSecurityParameter(identifier, minLiqRetainedBps, limitBeginThreshold, settlementModule);
+        _updateSecurityParameter(
+            identifier,
+            minLiqRetainedBps,
+            limitBeginThreshold,
+            settlementModule
+        );
     }
 
     /// @inheritdoc IERC7265CircuitBreaker
-    function setCircuitBreakerOperationalStatus(bool newOperationalStatus) external override onlyOwner {
+    function setCircuitBreakerOperationalStatus(
+        bool newOperationalStatus
+    ) external override onlyOwner {
         isOperational = newOperationalStatus;
     }
 
@@ -115,7 +136,14 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         uint256 settlementValue,
         bytes memory settlementPayload
     ) external override returns (bool) {
-        return _increaseParameter(identifier, amount, settlementTarget, settlementValue, settlementPayload);
+        return
+            _increaseParameter(
+                identifier,
+                amount,
+                settlementTarget,
+                settlementValue,
+                settlementPayload
+            );
     }
 
     /// @inheritdoc IERC7265CircuitBreaker
@@ -126,7 +154,14 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         uint256 settlementValue,
         bytes memory settlementPayload
     ) external override returns (bool) {
-        return _decreaseParameter(identifier, amount, settlementTarget, settlementValue, settlementPayload);
+        return
+            _decreaseParameter(
+                identifier,
+                amount,
+                settlementTarget,
+                settlementValue,
+                settlementPayload
+            );
     }
 
     /**
@@ -144,12 +179,13 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         return limiters[identifier].status() == LimitStatus.Triggered;
     }
 
-    function liquidityChanges(bytes32 identifier, uint256 _tickTimestamp)
-        external
-        view
-        returns (uint256 nextTimestamp, int256 amount)
-    {
-        LiqChangeNode storage node = limiters[identifier].listNodes[_tickTimestamp];
+    function liquidityChanges(
+        bytes32 identifier,
+        uint256 _tickTimestamp
+    ) external view returns (uint256 nextTimestamp, int256 amount) {
+        LiqChangeNode storage node = limiters[identifier].listNodes[
+            _tickTimestamp
+        ];
         nextTimestamp = node.nextTimestamp;
         amount = node.amount;
     }
@@ -163,8 +199,17 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         address settlementModule
     ) internal {
         Limiter storage limiter = limiters[identifier];
-        limiter.init(minValBps, limitBeginThreshold, ISettlementModule(settlementModule));
-        emit SecurityParameterAdded(identifier, minValBps, limitBeginThreshold, settlementModule);
+        limiter.init(
+            minValBps,
+            limitBeginThreshold,
+            ISettlementModule(settlementModule)
+        );
+        emit SecurityParameterAdded(
+            identifier,
+            minValBps,
+            limitBeginThreshold,
+            settlementModule
+        );
     }
 
     function _updateSecurityParameter(
@@ -174,7 +219,11 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         address settlementModule
     ) internal {
         Limiter storage limiter = limiters[identifier];
-        limiter.updateParams(minValBps, limitBeginThreshold, ISettlementModule(settlementModule));
+        limiter.updateParams(
+            minValBps,
+            limitBeginThreshold,
+            ISettlementModule(settlementModule)
+        );
         limiter.sync(WITHDRAWAL_PERIOD);
     }
 
@@ -192,7 +241,12 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         limiter.recordChange(int256(amount), WITHDRAWAL_PERIOD, TICK_LENGTH);
         if (limiter.status() == LimitStatus.Triggered) {
             emit RateLimited(identifier);
-            _onCircuitBreakerTrigger(limiter, settlementTarget, settlementValue, settlementPayload);
+            _onCircuitBreakerTrigger(
+                limiter,
+                settlementTarget,
+                settlementValue,
+                settlementPayload
+            );
             return true;
         }
         return false;
@@ -218,7 +272,12 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         // Check if rate limit is triggered after withdrawal
         if (limiter.status() == LimitStatus.Triggered) {
             emit RateLimited(identifier);
-            _onCircuitBreakerTrigger(limiter, settlementTarget, settlementValue, settlementPayload);
+            _onCircuitBreakerTrigger(
+                limiter,
+                settlementTarget,
+                settlementValue,
+                settlementPayload
+            );
             return true;
         }
         return false;
@@ -230,6 +289,10 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         uint256 settlementValue,
         bytes memory settlementPayload
     ) internal virtual {
-        limiter.settlementModule.prevent{value: settlementValue}(settlementTarget, settlementValue, settlementPayload);
+        limiter.settlementModule.prevent{value: settlementValue}(
+            settlementTarget,
+            settlementValue,
+            settlementPayload
+        );
     }
 }
