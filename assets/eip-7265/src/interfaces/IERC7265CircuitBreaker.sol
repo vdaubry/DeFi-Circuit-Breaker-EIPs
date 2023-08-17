@@ -7,6 +7,15 @@ import {Limiter} from "../static/Structs.sol";
 /// @dev See https://eips.ethereum.org/EIPS/eip-7265
 interface IERC7265CircuitBreaker {
     /**
+     * @notice Event emitted whenever a new security parameter configuration is added
+     * @param identifier The identifier of the security parameter
+     * @param minValBps The minimum value of the security parameter in percent
+     * @param limitBeginThreshold The minimal amount of a security parameter that MUST be reached before the Circuit Breaker checks for a breach
+     * @param settlementModule The address of the settlement module
+     * @dev This event MUST be emitted when a new security parameter is added     
+     */
+    event SecurityParameterAdded(bytes32 indexed identifier, uint256 minValBps, uint256 limitBeginThreshold, address settlementModule);
+    /**
      * @notice Event emitted whenever the security parameter is increased
      * @param amount The amount by which the security parameter is increased
      * @param identifier The identifier of the security parameter

@@ -158,22 +158,23 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
 
     function _addSecurityParameter(
         bytes32 identifier,
-        uint256 minLiqRetainedBps,
+        uint256 minValBps,
         uint256 limitBeginThreshold,
         address settlementModule
     ) internal {
         Limiter storage limiter = limiters[identifier];
-        limiter.init(minLiqRetainedBps, limitBeginThreshold, ISettlementModule(settlementModule));
+        limiter.init(minValBps, limitBeginThreshold, ISettlementModule(settlementModule));
+        emit SecurityParameterAdded(identifier, minValBps, limitBeginThreshold, settlementModule);
     }
 
     function _updateSecurityParameter(
         bytes32 identifier,
-        uint256 minLiqRetainedBps,
+        uint256 minValBps,
         uint256 limitBeginThreshold,
         address settlementModule
     ) internal {
         Limiter storage limiter = limiters[identifier];
-        limiter.updateParams(minLiqRetainedBps, limitBeginThreshold, ISettlementModule(settlementModule));
+        limiter.updateParams(minValBps, limitBeginThreshold, ISettlementModule(settlementModule));
         limiter.sync(WITHDRAWAL_PERIOD);
     }
 
