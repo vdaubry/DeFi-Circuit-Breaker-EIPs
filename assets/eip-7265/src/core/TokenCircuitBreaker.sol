@@ -101,7 +101,7 @@ contract TokenCircuitBreaker is CircuitBreaker, ITokenCircuitBreaker {
 
     /// @dev FIREWALL TRIGGER OVERRIDE
 
-    function _onFirewallTrigger(
+    function _onCircuitBreakerTrigger(
         Limiter storage limiter,
         address settlementTarget,
         uint256 settlementValue,

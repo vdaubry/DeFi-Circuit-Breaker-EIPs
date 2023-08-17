@@ -192,7 +192,7 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         limiter.recordChange(int256(amount), WITHDRAWAL_PERIOD, TICK_LENGTH);
         if (limiter.status() == LimitStatus.Triggered) {
             emit RateLimited(identifier);
-            _onFirewallTrigger(limiter, settlementTarget, settlementValue, settlementPayload);
+            _onCircuitBreakerTrigger(limiter, settlementTarget, settlementValue, settlementPayload);
             return true;
         }
         return false;
@@ -218,13 +218,13 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         // Check if rate limit is triggered after withdrawal
         if (limiter.status() == LimitStatus.Triggered) {
             emit RateLimited(identifier);
-            _onFirewallTrigger(limiter, settlementTarget, settlementValue, settlementPayload);
+            _onCircuitBreakerTrigger(limiter, settlementTarget, settlementValue, settlementPayload);
             return true;
         }
         return false;
     }
 
-    function _onFirewallTrigger(
+    function _onCircuitBreakerTrigger(
         Limiter storage limiter,
         address settlementTarget,
         uint256 settlementValue,
