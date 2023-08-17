@@ -37,12 +37,16 @@ contract DelayedSettlementModule is
     }
 
     // Add comment on who is allowed to execute (cf TimelockController.sol)
-    function execute(bytes calldata extendedPayload) external override {
-        (address target, uint256 value, bytes memory innerPayload) = abi.decode(
-            extendedPayload,
-            (address, uint256, bytes)
-        );
-        super.execute(target, value, extendedPayload, bytes32(0), bytes32(0));
+    function execute(
+        address target,
+        uint256 value,
+        bytes calldata innerPayload
+    ) external override {
+        // (address target, uint256 value, bytes memory innerPayload) = abi.decode(
+        //     extendedPayload,
+        //     (address, uint256, bytes)
+        // );
+        super.execute(target, value, innerPayload, bytes32(0), bytes32(0));
     }
 
     // Add comments with questions

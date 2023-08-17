@@ -46,4 +46,28 @@ contract DelayedSettlementModuleTest is Test {
             "Effect ID mismatch."
         );
     }
+
+    function test_execute() public {
+        bytes memory innerPayload = abi.encodeWithSignature(
+            "mint(address,uint256)",
+            bob,
+            1_000e18
+        );
+
+        vm.prank(admin);
+        bytes32 effectID = delayedSettlementModule.prevent(
+            address(token),
+            0,
+            innerPayload
+        );
+
+        // warp time to exceed the minimum delay
+        vm.warp(2 seconds);
+
+        vm.prank(admin);
+        delayedSettlementModule.execute(address(token), 0, innerPayload);
+
+        // Assert that Bob now has the minted tokens
+        assertEq(token.balanceOf(bob), 1_000e18, "Bob didn't receive tokens.");
+    }
 }
