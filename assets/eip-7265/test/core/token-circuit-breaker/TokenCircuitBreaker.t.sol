@@ -37,19 +37,36 @@ contract TokenCircuitBreakerTest is Test {
 
     function setUp() public {
         token = new MockToken("USDC", "USDC");
-        circuitBreaker = new TokenCircuitBreaker(4 hours, 5 minutes);
-        circuitBreaker.transferOwnership(admin);
-        delayedSettlementModule = new DelayedSettlementModule(1 seconds, new address[](0), new address[](0), admin);
+        circuitBreaker = new TokenCircuitBreaker(4 hours, 5 minutes, admin);
+        delayedSettlementModule = new DelayedSettlementModule(
+            1 seconds,
+            new address[](0),
+            new address[](0),
+            admin
+        );
 
         // allow token circuit breaker to propose (for calling prevent function)
         vm.prank(admin);
-        delayedSettlementModule.grantRole(keccak256("PROPOSER_ROLE"), address(circuitBreaker));
+        delayedSettlementModule.grantRole(
+            keccak256("PROPOSER_ROLE"),
+            address(circuitBreaker)
+        );
 
         vm.prank(admin);
         // Protect USDC with 70% max drawdown per 4 hours
-        circuitBreaker.registerAsset(address(token), 7000, 1000e18, address(delayedSettlementModule));
+        circuitBreaker.registerAsset(
+            address(token),
+            7000,
+            1000e18,
+            address(delayedSettlementModule)
+        );
         vm.prank(admin);
-        circuitBreaker.registerAsset(NATIVE_ADDRESS_PROXY, 7000, 1000e18, address(delayedSettlementModule));
+        circuitBreaker.registerAsset(
+            NATIVE_ADDRESS_PROXY,
+            7000,
+            1000e18,
+            address(delayedSettlementModule)
+        );
         vm.warp(1 hours);
 
         // register this contract
@@ -60,9 +77,13 @@ contract TokenCircuitBreakerTest is Test {
     }
 
     function test_getTokenIdentifier() public {
-        assertEq(circuitBreaker.getTokenIdentifier(address(token)), keccak256(abi.encodePacked(address(token))));
         assertEq(
-            circuitBreaker.getTokenIdentifier(NATIVE_ADDRESS_PROXY), keccak256(abi.encodePacked(NATIVE_ADDRESS_PROXY))
+            circuitBreaker.getTokenIdentifier(address(token)),
+            keccak256(abi.encodePacked(address(token)))
+        );
+        assertEq(
+            circuitBreaker.getTokenIdentifier(NATIVE_ADDRESS_PROXY),
+            keccak256(abi.encodePacked(NATIVE_ADDRESS_PROXY))
         );
     }
 
@@ -78,8 +99,11 @@ contract TokenCircuitBreakerTest is Test {
         uint256 withdrawalAmount = 300_001e18;
         vm.warp(5 hours);
 
-        bytes memory expectedCalldata =
-            abi.encodeWithSelector(bytes4(keccak256("transfer(address,uint256)")), address(token), withdrawalAmount);
+        bytes memory expectedCalldata = abi.encodeWithSelector(
+            bytes4(keccak256("transfer(address,uint256)")),
+            address(token),
+            withdrawalAmount
+        );
 
         // bytes32 expectedId =
         //     delayedSettlementModule.hashOperation(address(token), 0, expectedCalldata, bytes32(0), bytes32(0));
@@ -115,7 +139,7 @@ contract TokenCircuitBreakerTest is Test {
 
     function test_onNativeOutflow_doesNotTransferFundsIfTrigger() public {
         // cause firewall trigger (withdraw more than 30%)
-        
+
         // 10 thousand USDC deposited
         circuitBreaker.onNativeAssetInflow(10_000e18);
 
@@ -142,6 +166,9 @@ contract TokenCircuitBreakerTest is Test {
         circuitBreaker.onTokenOutflow(address(token), withdrawalAmount, alice);
 
         // test if tokens transferred to DSM
-        assertEq(token.balanceOf(address(delayedSettlementModule)), withdrawalAmount);
+        assertEq(
+            token.balanceOf(address(delayedSettlementModule)),
+            withdrawalAmount
+        );
     }
 }

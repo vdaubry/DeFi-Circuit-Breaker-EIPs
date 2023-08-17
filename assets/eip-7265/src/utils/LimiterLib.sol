@@ -49,15 +49,21 @@ library LimiterLib {
         limiter.settlementModule = settlementModule;
     }
 
-    function recordChange(Limiter storage limiter, int256 amount, uint256 withdrawalPeriod, uint256 tickLength)
-        internal
-    {
+    function recordChange(
+        Limiter storage limiter,
+        int256 amount,
+        uint256 withdrawalPeriod,
+        uint256 tickLength
+    ) internal {
         // If token does not have a rate limit, do nothing
         if (!isInitialized(limiter)) {
             return;
         }
 
-        uint256 currentTickTimestamp = getTickTimestamp(block.timestamp, tickLength);
+        uint256 currentTickTimestamp = getTickTimestamp(
+            block.timestamp,
+            tickLength
+        );
         limiter.liqInPeriod += amount;
 
         uint256 listHead = limiter.listHead;
@@ -65,7 +71,10 @@ library LimiterLib {
             // if there is no head, set the head to the new inflow
             limiter.listHead = currentTickTimestamp;
             limiter.listTail = currentTickTimestamp;
-            limiter.listNodes[currentTickTimestamp] = LiqChangeNode({amount: amount, nextTimestamp: 0});
+            limiter.listNodes[currentTickTimestamp] = LiqChangeNode({
+                amount: amount,
+                nextTimestamp: 0
+            });
         } else {
             // if there is a head, check if the new inflow is within the period
             // if it is, add it to the head
@@ -81,8 +90,13 @@ library LimiterLib {
                 limiter.listNodes[currentTickTimestamp].amount += amount;
             } else {
                 // add to tail
-                limiter.listNodes[listTail].nextTimestamp = currentTickTimestamp;
-                limiter.listNodes[currentTickTimestamp] = LiqChangeNode({amount: amount, nextTimestamp: 0});
+                limiter
+                    .listNodes[listTail]
+                    .nextTimestamp = currentTickTimestamp;
+                limiter.listNodes[currentTickTimestamp] = LiqChangeNode({
+                    amount: amount,
+                    nextTimestamp: 0
+                });
                 limiter.listTail = currentTickTimestamp;
             }
         }
@@ -92,12 +106,20 @@ library LimiterLib {
         sync(limiter, withdrawalPeriod, type(uint256).max);
     }
 
-    function sync(Limiter storage limiter, uint256 withdrawalPeriod, uint256 totalIters) internal {
+    function sync(
+        Limiter storage limiter,
+        uint256 withdrawalPeriod,
+        uint256 totalIters
+    ) internal {
         uint256 currentHead = limiter.listHead;
         int256 totalChange = 0;
         uint256 iter = 0;
 
-        while (currentHead != 0 && block.timestamp - currentHead >= withdrawalPeriod && iter < totalIters) {
+        while (
+            currentHead != 0 &&
+            block.timestamp - currentHead >= withdrawalPeriod &&
+            iter < totalIters
+        ) {
             LiqChangeNode storage node = limiter.listNodes[currentHead];
             totalChange += node.amount;
             uint256 nextTimestamp = node.nextTimestamp;
@@ -121,7 +143,9 @@ library LimiterLib {
         limiter.liqInPeriod -= totalChange;
     }
 
-    function status(Limiter storage limiter) internal view returns (LimitStatus) {
+    function status(
+        Limiter storage limiter
+    ) internal view returns (LimitStatus) {
         if (!isInitialized(limiter)) {
             return LimitStatus.Uninitialized;
         }
@@ -134,16 +158,22 @@ library LimiterLib {
 
         int256 futureLiq = currentLiq + limiter.liqInPeriod;
         // NOTE: uint256 to int256 conversion here is safe
-        int256 minLiq = (currentLiq * int256(limiter.minLiqRetainedBps)) / int256(BPS_DENOMINATOR);
+        int256 minLiq = (currentLiq * int256(limiter.minLiqRetainedBps)) /
+            int256(BPS_DENOMINATOR);
 
         return futureLiq < minLiq ? LimitStatus.Triggered : LimitStatus.Ok;
     }
 
-    function isInitialized(Limiter storage limiter) internal view returns (bool) {
+    function isInitialized(
+        Limiter storage limiter
+    ) internal view returns (bool) {
         return limiter.minLiqRetainedBps > 0;
     }
 
-    function getTickTimestamp(uint256 t, uint256 tickLength) internal pure returns (uint256) {
+    function getTickTimestamp(
+        uint256 t,
+        uint256 tickLength
+    ) internal pure returns (uint256) {
         return t - (t % tickLength);
     }
 }

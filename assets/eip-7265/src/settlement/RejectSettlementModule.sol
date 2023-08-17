@@ -12,21 +12,22 @@ contract RejectSettlementModule is IRejectSettlementModule {
 
     constructor() {}
 
-    function prevent(address target, uint256 value, bytes calldata innerPayload)
-        external
-        payable
-        override
-        returns (bytes32 newEffectID)
-    {
+    function prevent(
+        address target,
+        uint256 value,
+        bytes calldata innerPayload
+    ) external payable override returns (bytes32 newEffectID) {
         //Does it make sense to have a unique identifier for the scheduled effect since we revert ?
         newEffectID = keccak256(abi.encode(target, value, innerPayload));
         return newEffectID;
         revert();
     }
 
-    function execute(bytes calldata extendedPayload) external override {
-        (address target, uint256 value, bytes memory innerPayload) =
-            abi.decode(extendedPayload, (address, uint256, bytes));
+    function execute(
+        address target,
+        uint256 value,
+        bytes calldata payload
+    ) external override {
         revert cannotExecuteRejectedTransation();
     }
 }

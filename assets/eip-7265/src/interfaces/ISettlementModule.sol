@@ -18,17 +18,22 @@ interface ISettlementModule {
      * @param innerPayload The calldata for the call.
      * @return newEffectID A unique identifier for the scheduled effect.
      */
-    function prevent(address target, uint256 value, bytes calldata innerPayload)
-        external
-        payable
-        returns (bytes32 newEffectID);
+    function prevent(
+        address target,
+        uint256 value,
+        bytes calldata innerPayload
+    ) external payable returns (bytes32 newEffectID);
 
     /**
      * @notice Executes a settled effect based on the decoded contents in the extendedPayload.
      * @dev The extendedPayload should have the format <version 1-byte> | <inner data N-bytes>.
-     * @param extendedPayload The payload for the call.
-     *
-     * TODO: provide docs for the extendedPayload payload format
+     * @param target The address of the target contract.
+     * @param value The amount of native token to be sent with the call.
+     * @param innerPayload The calldata for the call.
      */
-    function execute(bytes calldata extendedPayload) external;
+    function execute(
+        address target,
+        uint256 value,
+        bytes calldata innerPayload
+    ) external;
 }
