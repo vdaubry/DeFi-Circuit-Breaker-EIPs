@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.19;
+pragma solidity ^0.8.19;
 
 /**
  * @title Interface for Settlement Modules: timelock (freeze funds) , Reject, etc
