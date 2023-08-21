@@ -128,6 +128,19 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         isOperational = newOperationalStatus;
     }
 
+    /**
+     * @dev Override the status of the limiter
+     * @param identifier The identifier of the limiter
+     * @param overrideStatus The status to override to
+     * @return The new status of the limiter
+     */
+    function setLimiterOverriden(
+        bytes32 identifier,
+        bool overrideStatus
+    ) external returns (bool) {
+        return limiters[identifier].overriden = overrideStatus;
+    }
+
     /// @inheritdoc IERC7265CircuitBreaker
     function increaseParameter(
         bytes32 identifier,

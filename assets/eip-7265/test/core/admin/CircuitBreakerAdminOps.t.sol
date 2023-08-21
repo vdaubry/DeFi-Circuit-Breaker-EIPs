@@ -139,6 +139,7 @@ contract CircuitBreakerAdminOpsTest is Test {
             ,
             ,
             ,
+            ,
 
         ) = circuitBreaker.limiters(identifier);
         assertEq(minAmount, 1000e18);
@@ -151,9 +152,8 @@ contract CircuitBreakerAdminOpsTest is Test {
             2000e18,
             address(delayedSettlementModule)
         );
-        (minLiquidityThreshold, minAmount, , , , , ) = circuitBreaker.limiters(
-            identifier
-        );
+        (minLiquidityThreshold, minAmount, , , , , , ) = circuitBreaker
+            .limiters(identifier);
         assertEq(minAmount, 2000e18);
         assertEq(minLiquidityThreshold, 8000);
     }
@@ -186,6 +186,24 @@ contract CircuitBreakerAdminOpsTest is Test {
         assertEq(
             circuitBreaker.isProtectedContract(address(secondDeFi)),
             false
+        );
+    }
+
+    function testSetLimiterOverriden() public {
+        circuitBreaker = new TokenCircuitBreaker(4 hours, 5 minutes, admin);
+        bytes32 identifier = "test";
+        bool overrideStatus = true;
+        bool expected = true;
+
+        bool result = circuitBreaker.setLimiterOverriden(
+            identifier,
+            overrideStatus
+        );
+
+        assertEq(
+            result,
+            expected,
+            "Limiter override status was not set correctly"
         );
     }
 }

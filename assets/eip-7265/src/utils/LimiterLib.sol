@@ -149,6 +149,10 @@ library LimiterLib {
         if (!isInitialized(limiter)) {
             return LimitStatus.Uninitialized;
         }
+        if (limiter.overriden) {
+            return LimitStatus.Ok;
+        }
+
         int256 currentLiq = limiter.liqTotal;
 
         // Only enforce rate limit if there is significant liquidity
