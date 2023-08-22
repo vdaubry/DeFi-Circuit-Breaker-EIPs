@@ -171,4 +171,26 @@ contract TokenCircuitBreakerTest is Test {
             withdrawalAmount
         );
     }
+
+    function test_onTokenOutflow_WhenOverriden_transferFundsIfTrigger() public {
+        // cause firewall trigger (withdraw more than 30%)
+        // 1 Million USDC deposited
+        token.mint(alice, 1_000_000e18);
+
+        vm.prank(alice);
+        token.transfer(address(circuitBreaker), 1_000_000e18);
+        circuitBreaker.onTokenInflow(address(token), 1_000_000e18);
+        bytes32 tokenIdentifier = circuitBreaker.getTokenIdentifier(
+            address(token)
+        );
+        circuitBreaker.setLimiterOverriden(tokenIdentifier, true);
+
+        uint256 withdrawalAmount = 300_001e18;
+        vm.warp(5 hours);
+
+        circuitBreaker.onTokenOutflow(address(token), withdrawalAmount, alice);
+
+        // balance of alice should not have increased
+        assertEq(token.balanceOf(alice), 300_001e18);
+    }
 }

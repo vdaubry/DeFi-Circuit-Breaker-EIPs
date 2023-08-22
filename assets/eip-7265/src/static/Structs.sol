@@ -17,4 +17,5 @@ struct Limiter {
     uint256 listTail;
     mapping(uint256 tick => LiqChangeNode node) listNodes;
     ISettlementModule settlementModule;
+    bool overriden;
 }
