@@ -5,17 +5,17 @@ import "forge-std/console.sol";
 
 import {Test} from "forge-std/Test.sol";
 import {MockToken} from "../../mocks/MockToken.sol";
-import {TokenCircuitBreaker} from "../../../src/core/TokenCircuitBreaker.sol";
+import {AssetCircuitBreaker} from "../../../src/core/AssetCircuitBreaker.sol";
 import {DelayedSettlementModule} from "../../../src/settlement/DelayedSettlementModule.sol";
 import {LimiterLib} from "../../../src/utils/LimiterLib.sol";
 
-contract TokenCircuitBreakerTest is Test {
+contract AssetCircuitBreakerTest is Test {
     MockToken internal token;
     MockToken internal secondToken;
     MockToken internal unlimitedToken;
 
     address internal NATIVE_ADDRESS_PROXY = address(1);
-    TokenCircuitBreaker internal circuitBreaker;
+    AssetCircuitBreaker internal circuitBreaker;
     DelayedSettlementModule internal delayedSettlementModule;
 
     address internal alice = vm.addr(0x1);
@@ -37,7 +37,7 @@ contract TokenCircuitBreakerTest is Test {
 
     function setUp() public {
         token = new MockToken("USDC", "USDC");
-        circuitBreaker = new TokenCircuitBreaker(4 hours, 5 minutes, admin);
+        circuitBreaker = new AssetCircuitBreaker(4 hours, 5 minutes, admin);
         delayedSettlementModule = new DelayedSettlementModule(
             1 seconds,
             new address[](0),
