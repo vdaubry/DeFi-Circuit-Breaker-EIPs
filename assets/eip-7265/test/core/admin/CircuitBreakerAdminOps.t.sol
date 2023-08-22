@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import {Test} from "forge-std/Test.sol";
 import {MockToken} from "../../mocks/MockToken.sol";
 import {MockDeFiProtocol} from "../../mocks/MockDeFiProtocol.sol";
-import {TokenCircuitBreaker} from "../../../src/core/TokenCircuitBreaker.sol";
+import {AssetCircuitBreaker} from "../../../src/core/AssetCircuitBreaker.sol";
 import {DelayedSettlementModule} from "../../../src/settlement/DelayedSettlementModule.sol";
 import {LimiterLib} from "../../../src/utils/LimiterLib.sol";
 
@@ -14,7 +14,7 @@ contract CircuitBreakerAdminOpsTest is Test {
     MockToken internal unlimitedToken;
 
     address internal NATIVE_ADDRESS_PROXY = address(1);
-    TokenCircuitBreaker internal circuitBreaker;
+    AssetCircuitBreaker internal circuitBreaker;
     DelayedSettlementModule internal delayedSettlementModule;
     MockDeFiProtocol internal deFi;
 
@@ -24,7 +24,7 @@ contract CircuitBreakerAdminOpsTest is Test {
 
     function setUp() public {
         token = new MockToken("USDC", "USDC");
-        circuitBreaker = new TokenCircuitBreaker(4 hours, 5 minutes, admin);
+        circuitBreaker = new AssetCircuitBreaker(4 hours, 5 minutes, admin);
         deFi = new MockDeFiProtocol(address(circuitBreaker));
 
         address[] memory addresses = new address[](1);
@@ -52,7 +52,7 @@ contract CircuitBreakerAdminOpsTest is Test {
     }
 
     function test_initialization_shouldBeSuccessful() public {
-        TokenCircuitBreaker newCircuitBreaker = new TokenCircuitBreaker(
+        AssetCircuitBreaker newCircuitBreaker = new AssetCircuitBreaker(
             3 hours,
             5 minutes,
             admin
@@ -190,7 +190,7 @@ contract CircuitBreakerAdminOpsTest is Test {
     }
 
     function testSetLimiterOverriden() public {
-        circuitBreaker = new TokenCircuitBreaker(4 hours, 5 minutes, admin);
+        circuitBreaker = new AssetCircuitBreaker(4 hours, 5 minutes, admin);
         bytes32 identifier = "test";
         bool overrideStatus = true;
         bool expected = true;

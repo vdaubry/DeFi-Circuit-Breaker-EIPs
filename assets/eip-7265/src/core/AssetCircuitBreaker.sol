@@ -6,7 +6,7 @@ import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
 
 import {IERC7265CircuitBreaker} from "../interfaces/IERC7265CircuitBreaker.sol";
-import {ITokenCircuitBreaker} from "../interfaces/ITokenCircuitBreaker.sol";
+import {IAssetCircuitBreaker} from "../interfaces/IAssetCircuitBreaker.sol";
 import {ISettlementModule} from "../interfaces/ISettlementModule.sol";
 
 import {CircuitBreaker} from "./CircuitBreaker.sol";
@@ -14,7 +14,7 @@ import {CircuitBreaker} from "./CircuitBreaker.sol";
 import {Limiter} from "../static/Structs.sol";
 import {LimiterLib, LimitStatus} from "../utils/LimiterLib.sol";
 
-contract TokenCircuitBreaker is CircuitBreaker, ITokenCircuitBreaker {
+contract AssetCircuitBreaker is CircuitBreaker, IAssetCircuitBreaker {
     using LimiterLib for Limiter;
     using SafeERC20 for IERC20;
 

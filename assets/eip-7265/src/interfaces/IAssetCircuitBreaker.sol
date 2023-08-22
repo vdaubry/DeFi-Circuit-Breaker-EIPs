@@ -3,9 +3,9 @@ pragma solidity ^0.8.19;
 
 import {IERC7265CircuitBreaker} from "./IERC7265CircuitBreaker.sol";
 
-/// @title ITokenCircuitBreaker
-/// @dev This interface defines the methods for the TokenCircuitBreaker
-interface ITokenCircuitBreaker is IERC7265CircuitBreaker {
+/// @title IAssetCircuitBreaker
+/// @dev This interface defines the methods for the AssetCircuitBreaker
+interface IAssetCircuitBreaker is IERC7265CircuitBreaker {
     /// @dev MUST be emitted in `onTokenInflow` and `onNativeAssetInflow` when an asset is successfully deposited
     /// @param asset MUST be the address of the asset withdrawn.
     /// For any EIP-20 token, MUST be an EIP-20 token contract.

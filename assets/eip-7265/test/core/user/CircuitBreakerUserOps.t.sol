@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import {Test} from "forge-std/Test.sol";
 import {MockToken} from "../../mocks/MockToken.sol";
 import {MockDeFiProtocol} from "../../mocks/MockDeFiProtocol.sol";
-import {TokenCircuitBreaker} from "../../../src/core/TokenCircuitBreaker.sol";
+import {AssetCircuitBreaker} from "../../../src/core/AssetCircuitBreaker.sol";
 import {DelayedSettlementModule} from "../../../src/settlement/DelayedSettlementModule.sol";
 import {LimiterLib} from "../../../src/utils/LimiterLib.sol";
 
@@ -14,7 +14,7 @@ contract CircuitBreakerUserOpsTest is Test {
     MockToken internal unlimitedToken;
 
     address internal NATIVE_ADDRESS_PROXY = address(1);
-    TokenCircuitBreaker internal circuitBreaker;
+    AssetCircuitBreaker internal circuitBreaker;
     DelayedSettlementModule internal delayedSettlementModule;
     MockDeFiProtocol internal deFi;
 
@@ -24,7 +24,7 @@ contract CircuitBreakerUserOpsTest is Test {
 
     function setUp() public {
         token = new MockToken("USDC", "USDC");
-        circuitBreaker = new TokenCircuitBreaker(4 hours, 5 minutes, admin);
+        circuitBreaker = new AssetCircuitBreaker(4 hours, 5 minutes, admin);
         delayedSettlementModule = new DelayedSettlementModule(
             1 seconds,
             new address[](0),
