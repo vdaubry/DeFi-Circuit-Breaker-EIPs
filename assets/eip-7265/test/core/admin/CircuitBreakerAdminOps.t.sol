@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {MockToken} from "../../mocks/MockToken.sol";
 import {MockDeFiProtocol} from "../../mocks/MockDeFiProtocol.sol";
 import {AssetCircuitBreaker} from "../../../src/core/AssetCircuitBreaker.sol";
+import {CircuitBreaker} from "../../../src/core/CircuitBreaker.sol";
 import {DelayedSettlementModule} from "../../../src/settlement/DelayedSettlementModule.sol";
 import {LimiterLib} from "../../../src/utils/LimiterLib.sol";
 
@@ -24,7 +25,7 @@ contract CircuitBreakerAdminOpsTest is Test {
 
     function setUp() public {
         token = new MockToken("USDC", "USDC");
-        circuitBreaker = new AssetCircuitBreaker(4 hours, 5 minutes, admin);
+        circuitBreaker = new AssetCircuitBreaker(3 days, 4 hours, 5 minutes, admin);
         deFi = new MockDeFiProtocol(address(circuitBreaker));
 
         address[] memory addresses = new address[](1);
@@ -53,6 +54,7 @@ contract CircuitBreakerAdminOpsTest is Test {
 
     function test_initialization_shouldBeSuccessful() public {
         AssetCircuitBreaker newCircuitBreaker = new AssetCircuitBreaker(
+            3 days,
             3 hours,
             5 minutes,
             admin
@@ -190,7 +192,7 @@ contract CircuitBreakerAdminOpsTest is Test {
     }
 
     function testSetLimiterOverriden() public {
-        circuitBreaker = new AssetCircuitBreaker(4 hours, 5 minutes, admin);
+        circuitBreaker = new AssetCircuitBreaker(3 days, 4 hours, 5 minutes, admin);
         bytes32 identifier = "test";
         bool overrideStatus = true;
         bool expected = true;
@@ -205,5 +207,21 @@ contract CircuitBreakerAdminOpsTest is Test {
             expected,
             "Limiter override status was not set correctly"
         );
+    }
+
+    function test_startGracePeriod_whenCallerIsNotAdminShouldFail() public {
+        vm.expectRevert();
+        circuitBreaker.startGracePeriod(block.timestamp + 10);
+    }
+
+    function test_startGracePeriod_whenGracePeriodEndIsInThePastShouldFail() public {
+        vm.prank(admin);
+        vm.expectRevert(CircuitBreaker.CircuitBreaker__InvalidGracePeriodEnd.selector);
+        circuitBreaker.startGracePeriod(block.timestamp - 10);
+    }
+
+    function test_startGracePeriod_shouldBeSuccessfull() public {
+        vm.prank(admin);
+        circuitBreaker.startGracePeriod(block.timestamp + 10);
     }
 }

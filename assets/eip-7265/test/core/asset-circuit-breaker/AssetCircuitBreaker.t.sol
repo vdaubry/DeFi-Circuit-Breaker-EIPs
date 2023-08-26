@@ -37,7 +37,7 @@ contract AssetCircuitBreakerTest is Test {
 
     function setUp() public {
         token = new MockToken("USDC", "USDC");
-        circuitBreaker = new AssetCircuitBreaker(4 hours, 5 minutes, admin);
+        circuitBreaker = new AssetCircuitBreaker(3 days, 4 hours, 5 minutes, admin);
         delayedSettlementModule = new DelayedSettlementModule(
             1 seconds,
             new address[](0),

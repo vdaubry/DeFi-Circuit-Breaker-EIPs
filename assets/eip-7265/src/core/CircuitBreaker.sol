@@ -29,6 +29,14 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
 
     bool public isOperational = true;
 
+    bool public isRateLimited;
+
+    uint256 public rateLimitCooldownPeriod;
+
+    uint256 public lastRateLimitTimestamp;
+
+    uint256 public gracePeriodEndTimestamp;
+
     ////////////////////////////////////////////////////////////////
     //                           ERRORS                           //
     ////////////////////////////////////////////////////////////////
@@ -36,6 +44,9 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
     error CircuitBreaker__NotAProtectedContract();
     error CircuitBreaker__NotOperational();
     error CircuitBreaker__RateLimited();
+    error CircuitBreaker__NotRateLimited();
+    error CircuitBreaker__InvalidGracePeriodEnd();
+    error CircuitBreaker__CooldownPeriodNotReached();
 
     ////////////////////////////////////////////////////////////////
     //                         MODIFIERS                          //
@@ -61,10 +72,12 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
     }
 
     constructor(
+        uint256 _rateLimitCooldownPeriod,
         uint256 _withdrawalPeriod,
         uint256 _liquidityTickLength,
         address _initialOwner
     ) Ownable(_initialOwner) {
+        rateLimitCooldownPeriod = _rateLimitCooldownPeriod;
         WITHDRAWAL_PERIOD = _withdrawalPeriod;
         TICK_LENGTH = _liquidityTickLength;
     }
@@ -128,6 +141,20 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         isOperational = newOperationalStatus;
     }
 
+    function startGracePeriod(uint256 _gracePeriodEndTimestamp) external onlyOwner {
+        if (_gracePeriodEndTimestamp <= block.timestamp) revert CircuitBreaker__InvalidGracePeriodEnd();
+        gracePeriodEndTimestamp = _gracePeriodEndTimestamp;
+        emit GracePeriodStarted(_gracePeriodEndTimestamp);
+    }
+
+    function overrideRateLimit() external onlyOwner {
+        if (!isRateLimited) revert CircuitBreaker__NotRateLimited();
+        isRateLimited = false;
+        // Allow the grace period to extend for the full withdrawal period to not trigger rate limit again
+        // if the rate limit is removed just before the withdrawal period ends
+        gracePeriodEndTimestamp = lastRateLimitTimestamp + WITHDRAWAL_PERIOD;
+    }
+
     /**
      * @dev Override the status of the limiter
      * @param identifier The identifier of the limiter
@@ -177,6 +204,15 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
             );
     }
 
+    function overrideExpiredRateLimit() external {
+        if (!isRateLimited) revert CircuitBreaker__NotRateLimited();
+        if (block.timestamp - lastRateLimitTimestamp < rateLimitCooldownPeriod) {
+            revert CircuitBreaker__CooldownPeriodNotReached();
+        }
+
+        isRateLimited = false;
+    }
+
     /**
      * @dev Due to potential inactivity, the linked list may grow to where
      * it is better to clear the backlog in advance to save gas for the users
@@ -188,8 +224,12 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
 
     /// @dev EXTERNAL VIEW FUNCTIONS
 
-    function isRateLimited(bytes32 identifier) external view returns (bool) {
+    function isParameterRateLimited(bytes32 identifier) external view returns (bool) {
         return limiters[identifier].status() == LimitStatus.Triggered;
+    }
+
+    function isInGracePeriod() public view returns (bool) {
+        return block.timestamp <= gracePeriodEndTimestamp;
     }
 
     function liquidityChanges(
@@ -252,8 +292,9 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
 
         emit ParameterInrease(amount, identifier);
         limiter.recordChange(int256(amount), WITHDRAWAL_PERIOD, TICK_LENGTH);
-        if (limiter.status() == LimitStatus.Triggered) {
+        if (limiter.status() == LimitStatus.Triggered && !isInGracePeriod()) {
             emit RateLimited(identifier);
+            isRateLimited = true;
             _onCircuitBreakerTrigger(
                 limiter,
                 settlementTarget,
@@ -283,8 +324,9 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         limiter.recordChange(-int256(amount), WITHDRAWAL_PERIOD, TICK_LENGTH);
 
         // Check if rate limit is triggered after withdrawal
-        if (limiter.status() == LimitStatus.Triggered) {
+        if (limiter.status() == LimitStatus.Triggered && !isInGracePeriod()) {
             emit RateLimited(identifier);
+            isRateLimited = true;
             _onCircuitBreakerTrigger(
                 limiter,
                 settlementTarget,

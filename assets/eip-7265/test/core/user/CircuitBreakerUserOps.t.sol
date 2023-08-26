@@ -24,7 +24,7 @@ contract CircuitBreakerUserOpsTest is Test {
 
     function setUp() public {
         token = new MockToken("USDC", "USDC");
-        circuitBreaker = new AssetCircuitBreaker(4 hours, 5 minutes, admin);
+        circuitBreaker = new AssetCircuitBreaker(3 days, 4 hours, 5 minutes, admin);
         delayedSettlementModule = new DelayedSettlementModule(
             1 seconds,
             new address[](0),
@@ -340,6 +340,31 @@ contract CircuitBreakerUserOpsTest is Test {
         assertEq(liqTotal, 10_000e18);
 
         // TODO: test executing release of funds on DSM
+    }
+
+    function test_breachAndLimitExpired() public {
+        // 1 Million USDC deposited
+        token.mint(alice, 1_000_000e18);
+
+        vm.prank(alice);
+        token.approve(address(deFi), 1_000_000e18);
+
+        vm.prank(alice);
+        deFi.deposit(address(token), 1_000_000e18);
+
+        // HACK
+        // 300k USDC withdrawn
+        int256 withdrawalAmount = 300_001e18;
+        vm.warp(5 hours);
+        vm.prank(alice);
+        deFi.withdrawal(address(token), uint256(withdrawalAmount));
+        assertEq(circuitBreaker.isTokenRateLimited(address(token)), true);
+        assertEq(circuitBreaker.isRateLimited(), true);
+
+        vm.warp(4 days);
+        vm.prank(alice);
+        circuitBreaker.overrideExpiredRateLimit();
+        assertEq(circuitBreaker.isRateLimited(), false);
     }
 
     function test_depositsAndWithdrawlsInSameTickLength() public {

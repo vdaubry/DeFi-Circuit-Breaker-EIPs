@@ -33,6 +33,10 @@ interface IERC7265CircuitBreaker {
      */
     event RateLimited(bytes32 indexed identifier);
 
+    /// @dev MUST be emitted in `startGracePeriod` when a new grace period is successfully started
+    /// @param gracePeriodEnd MUST be the end timestamp of the new grace period
+    event GracePeriodStarted(uint256 gracePeriodEnd);
+
     /**
      * @notice Function for increasing the current security parameter
      * @param identifier is the identifier of the security parameter
@@ -124,7 +128,7 @@ interface IERC7265CircuitBreaker {
      * @param identifier is the identifier of the security parameter
      * @dev MUST return true if the security parameter is breached
      */
-    function isRateLimited(bytes32 identifier) external view returns (bool);
+    function isParameterRateLimited(bytes32 identifier) external view returns (bool);
 
     /**
      * @notice Add new protected contracts
@@ -152,4 +156,21 @@ interface IERC7265CircuitBreaker {
     /// @dev MAY be called by admin to pause / unpause the Circuit Breaker
     /// While the protocol is not operational: inflows, outflows, and claiming locked funds MUST revert
     function setCircuitBreakerOperationalStatus(bool newOperationalStatus) external;
+
+    /// @notice Override a rate limit
+    /// @dev This method MAY be called when the protocol admin (typically governance) is certain that a rate limit is the result of a false positive.
+    /// MUST revert if caller is not the current admin.
+    /// MUST allow the grace period to extend for the full withdrawal period to not trigger the rate limit again if the rate limit is removed just before the withdrawal period ends.
+    /// MUST revert if the circuit breaker is not currently rate limited.
+    function overrideRateLimit() external;
+
+    /// @notice Override an expired rate limit
+    /// @dev This method MAY be called by anyone once the cooldown period is complete. 
+    /// MUST revert if the cooldown period is not complete.
+    /// MUST revert if the circuit breaker is not currently rate limited.
+    function overrideExpiredRateLimit() external;
+
+    /// @notice Check if the circuit breaker is currently in grace period
+    /// @return isInGracePeriod MUST return TRUE if the circuit breaker is currently in grace period, FALSE otherwise
+    function isInGracePeriod() external view returns (bool);
 }

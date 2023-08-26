@@ -28,10 +28,11 @@ contract AssetCircuitBreaker is CircuitBreaker, IAssetCircuitBreaker {
     address public immutable NATIVE_ADDRESS_PROXY = address(1);
 
     constructor(
+        uint256 _rateLimitCooldownPeriod,
         uint256 _withdrawalPeriod,
         uint256 _liquidityTickLength,
         address _initialOwner
-    ) CircuitBreaker(_withdrawalPeriod, _liquidityTickLength, _initialOwner) {}
+    ) CircuitBreaker(_rateLimitCooldownPeriod, _withdrawalPeriod, _liquidityTickLength, _initialOwner) {}
 
     /// @dev OWNABLE FUNCTIONS
 

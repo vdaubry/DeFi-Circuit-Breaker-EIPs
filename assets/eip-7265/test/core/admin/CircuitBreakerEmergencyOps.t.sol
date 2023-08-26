@@ -34,7 +34,7 @@ contract CircuitBreakerEmergencyOpsTest is Test {
     address internal admin = vm.addr(0x3);
 
     function setUp() public {
-        circuitBreaker = new AssetCircuitBreaker(4 hours, 5 minutes, admin);
+        circuitBreaker = new AssetCircuitBreaker(3 days, 4 hours, 5 minutes, admin);
         delayedSettlementModule = new DelayedSettlementModule(
             1 seconds,
             new address[](0),
@@ -98,6 +98,7 @@ contract CircuitBreakerEmergencyOpsTest is Test {
         vm.warp(5 hours);
         vm.prank(alice);
         deFi.withdrawal(address(token), uint256(withdrawalAmount));
+        assertEq(circuitBreaker.isRateLimited(), true);
         assertEq(
             circuitBreaker.isTokenRateLimited(address(secondToken)),
             false
