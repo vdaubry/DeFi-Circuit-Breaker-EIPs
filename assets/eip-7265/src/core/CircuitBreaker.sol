@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
@@ -147,12 +147,10 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         emit GracePeriodStarted(_gracePeriodEndTimestamp);
     }
 
-    function overrideRateLimit() external onlyOwner {
+    function overrideRateLimit(bytes32 identifier) external onlyOwner {
         if (!isRateLimited) revert CircuitBreaker__NotRateLimited();
         isRateLimited = false;
-        // Allow the grace period to extend for the full withdrawal period to not trigger rate limit again
-        // if the rate limit is removed just before the withdrawal period ends
-        gracePeriodEndTimestamp = lastRateLimitTimestamp + WITHDRAWAL_PERIOD;
+        limiters[identifier].sync(WITHDRAWAL_PERIOD);
     }
 
     /**

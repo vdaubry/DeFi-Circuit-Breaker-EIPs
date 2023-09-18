@@ -162,7 +162,7 @@ interface IERC7265CircuitBreaker {
     /// MUST revert if caller is not the current admin.
     /// MUST allow the grace period to extend for the full withdrawal period to not trigger the rate limit again if the rate limit is removed just before the withdrawal period ends.
     /// MUST revert if the circuit breaker is not currently rate limited.
-    function overrideRateLimit() external;
+    function overrideRateLimit(bytes32 identifier) external;
 
     /// @notice Override an expired rate limit
     /// @dev This method MAY be called by anyone once the cooldown period is complete. 
