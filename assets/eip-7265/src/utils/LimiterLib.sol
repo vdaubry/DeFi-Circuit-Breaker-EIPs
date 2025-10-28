@@ -72,8 +72,9 @@ library LimiterLib {
 
     /**
      * @notice Record a change in the security parameter
+     * @dev This function maintains a linked list of liquidity changes over time, allowing historical tracking
      * @param limiter The limiter to record the change for
-     * @param amount The amount of the change
+     * @param amount The amount of the change (positive for inflows, negative for outflows)
      * @param withdrawalPeriod The period over which the change is recorded
      * @param tickLength Unit of time to consider in seconds
      */
@@ -88,43 +89,47 @@ library LimiterLib {
             return;
         }
 
-        // all transactions that occur within a given tickLength will have the same currentTickTimestamp
+        // All transactions that occur within a given tickLength will have the same currentTickTimestamp
+        // This groups transactions together for efficient tracking
         uint256 currentTickTimestamp = getTickTimestamp(
             block.timestamp,
             tickLength
         );
+
+        // Update total liquidity change in the current period
         limiter.liqInPeriod += amount;
 
         uint256 listHead = limiter.listHead;
         if (listHead == 0) {
-            // if there is no head, set the head to the new inflow
+            // Initialize the linked list with the first node
+            // Both head and tail point to the same node initially
             limiter.listHead = currentTickTimestamp;
             limiter.listTail = currentTickTimestamp;
             limiter.listNodes[currentTickTimestamp] = LiqChangeNode({
                 amount: amount,
-                nextTimestamp: 0
+                nextTimestamp: 0  // No next node yet
             });
         } else {
-            // if there is a head, check if the new inflow is within the period
-            // if it is, add it to the head
-            // if it is not, add it to the tail
+            // Linked list already exists
+            // Check if the oldest entry (head) has expired beyond the withdrawal period
             if (block.timestamp - listHead >= withdrawalPeriod) {
+                // Remove expired entries from the linked list to maintain accurate period tracking
                 sync(limiter, withdrawalPeriod);
             }
 
-            // check if tail is the same as block.timestamp (multiple txs in same block)
+            // Check if the current tick already has an entry (multiple txs in same tick)
             uint256 listTail = limiter.listTail;
             if (listTail == currentTickTimestamp) {
-                // add amount
+                // Aggregate amount with existing entry for this tick
                 limiter.listNodes[currentTickTimestamp].amount += amount;
             } else {
-                // add to tail
+                // Create a new node and append it to the tail of the linked list
                 limiter
                     .listNodes[listTail]
-                    .nextTimestamp = currentTickTimestamp;
+                    .nextTimestamp = currentTickTimestamp;  // Link previous tail to new node
                 limiter.listNodes[currentTickTimestamp] = LiqChangeNode({
                     amount: amount,
-                    nextTimestamp: 0
+                    nextTimestamp: 0  // This is now the new tail
                 });
                 limiter.listTail = currentTickTimestamp;
             }
@@ -142,9 +147,10 @@ library LimiterLib {
 
     /**
      * @notice Sync the limiter to clear old data
+     * @dev Removes expired entries from the linked list and updates liquidity tracking
      * @param limiter The limiter to sync
-     * @param withdrawalPeriod the max period to keep track of
-     * @param totalIters the max number of iterations to perform
+     * @param withdrawalPeriod The max period to keep track of
+     * @param totalIters The max number of iterations to perform (prevents gas exhaustion)
      */
     function sync(
         Limiter storage limiter,
@@ -155,45 +161,63 @@ library LimiterLib {
         int256 totalChange = 0;
         uint256 iter = 0;
 
+        // Traverse the linked list from head, removing expired nodes
+        // Stop when: 1) list is empty, 2) found a non-expired node, 3) hit iteration limit
         while (
             currentHead != 0 &&
             block.timestamp - currentHead >= withdrawalPeriod &&
             iter < totalIters
         ) {
             LiqChangeNode storage node = limiter.listNodes[currentHead];
+
+            // Accumulate the amount from expired nodes to update totals later
             totalChange += node.amount;
+
             uint256 nextTimestamp = node.nextTimestamp;
-            // Clear data
+
+            // Clear the expired node data to free storage
             limiter.listNodes[currentHead];
+
+            // Move to the next node in the list
             currentHead = nextTimestamp;
+
             // forgefmt: disable-next-item
             unchecked {
-                ++iter;
+                ++iter;  // Safe to not check overflow as totalIters is reasonable
             }
         }
 
         if (currentHead == 0) {
-            // If the list is empty, set the tail and head to current times
+            // If the list is now empty after cleanup, reset head and tail to current time
+            // This prevents issues when recording new changes
             limiter.listHead = block.timestamp;
             limiter.listTail = block.timestamp;
         } else {
+            // Update the head to point to the first non-expired node
             limiter.listHead = currentHead;
         }
+
+        // Move expired amounts from liqInPeriod to liqTotal
+        // liqTotal tracks all-time liquidity, liqInPeriod tracks recent period liquidity
         limiter.liqTotal += totalChange;
         limiter.liqInPeriod -= totalChange;
     }
 
     /**
      * @notice Get the status of the limiter
+     * @dev Determines whether the limiter should trigger a rate limit based on liquidity thresholds
      * @param limiter The limiter to get the status for
-     * @return The status of the limiter
+     * @return The status of the limiter (Uninitialized, Inactive, Ok, or Triggered)
      */
     function status(
         Limiter storage limiter
     ) internal view returns (LimitStatus) {
+        // Check if the limiter has been configured
         if (!isInitialized(limiter)) {
             return LimitStatus.Uninitialized;
         }
+
+        // Check if admin has manually overridden the rate limit
         if (limiter.overriden) {
             return LimitStatus.Ok;
         }
@@ -201,15 +225,20 @@ library LimiterLib {
         int256 currentLiq = limiter.liqTotal;
 
         // Only enforce rate limit if there is significant liquidity
+        // This prevents false positives for low-liquidity assets or during protocol launch
         if (limiter.limitBeginThreshold > uint256(currentLiq)) {
             return LimitStatus.Inactive;
         }
 
+        // Calculate projected future liquidity by adding period changes to current total
         int256 futureLiq = currentLiq + limiter.liqInPeriod;
-        // NOTE: uint256 to int256 conversion here is safe
+
+        // Calculate minimum allowed liquidity as a percentage of current liquidity
+        // NOTE: uint256 to int256 conversion here is safe as values are within bounds
         int256 minLiq = (currentLiq * int256(limiter.minLiqRetainedBps)) /
             int256(BPS_DENOMINATOR);
 
+        // Trigger rate limit if future liquidity would drop below minimum threshold
         return futureLiq < minLiq ? LimitStatus.Triggered : LimitStatus.Ok;
     }
 
@@ -225,11 +254,10 @@ library LimiterLib {
     }
 
     /**
-        * @notice Get the timestamp for the current period (as defined by ticklength)
-        * @param t The current timestamp
-        * @param tickLength The tick length
-        * @return The current tick timestamp
-        */
+     * @notice Get the timestamp for the current period (as defined by ticklength)
+     * @param t The current timestamp
+     * @param tickLength The tick length
+     * @return The current tick timestamp
      */
     function getTickTimestamp(
         uint256 t,

@@ -11,6 +11,11 @@ import {ISettlementModule} from "../interfaces/ISettlementModule.sol";
 import {Limiter, LiqChangeNode} from "../static/Structs.sol";
 import {LimiterLib, LimitStatus} from "../utils/LimiterLib.sol";
 
+/**
+ * @title CircuitBreaker
+ * @notice Core circuit breaker contract implementing EIP-7265 for DeFi protocol protection
+ * @dev Tracks security parameters (e.g., liquidity) and triggers rate limits when thresholds are breached
+ */
 contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
     using SafeERC20 for IERC20;
     using LimiterLib for Limiter;
@@ -19,22 +24,32 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
     //                      STATE VARIABLES                       //
     ////////////////////////////////////////////////////////////////
 
+    /// @notice Mapping of security parameter identifiers to their respective limiters
     mapping(bytes32 identifier => Limiter limiter) public limiters;
+
+    /// @notice Mapping of contracts authorized to interact with this circuit breaker
     mapping(address _contract => bool protectionActive)
         public isProtectedContract;
 
+    /// @notice Time window over which liquidity changes are tracked
     uint256 public immutable WITHDRAWAL_PERIOD;
 
+    /// @notice Time granularity for grouping transactions (e.g., 1 hour)
     uint256 public immutable TICK_LENGTH;
 
+    /// @notice Flag indicating if the circuit breaker is operational (false = emergency shutdown)
     bool public isOperational = true;
 
+    /// @notice Global flag indicating if any security parameter has triggered a rate limit
     bool public isRateLimited;
 
+    /// @notice Time period after rate limit trigger before automatic override is allowed
     uint256 public rateLimitCooldownPeriod;
 
+    /// @notice Timestamp when the most recent rate limit was triggered
     uint256 public lastRateLimitTimestamp;
 
+    /// @notice Timestamp when the current grace period ends (allows transactions without triggering limits)
     uint256 public gracePeriodEndTimestamp;
 
     ////////////////////////////////////////////////////////////////
@@ -141,23 +156,35 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         isOperational = newOperationalStatus;
     }
 
+    /**
+     * @notice Start a grace period during which rate limits will not be triggered
+     * @dev Useful for known events like protocol migrations or upgrades that cause large liquidity movements
+     * @param _gracePeriodEndTimestamp The timestamp when the grace period ends
+     */
     function startGracePeriod(uint256 _gracePeriodEndTimestamp) external onlyOwner {
         if (_gracePeriodEndTimestamp <= block.timestamp) revert CircuitBreaker__InvalidGracePeriodEnd();
         gracePeriodEndTimestamp = _gracePeriodEndTimestamp;
         emit GracePeriodStarted(_gracePeriodEndTimestamp);
     }
 
+    /**
+     * @notice Manually override a triggered rate limit (for false positives)
+     * @dev Admin-only function to restore operations when rate limit is incorrectly triggered
+     * @param identifier The identifier of the security parameter to override
+     */
     function overrideRateLimit(bytes32 identifier) external onlyOwner {
         if (!isRateLimited) revert CircuitBreaker__NotRateLimited();
         isRateLimited = false;
+        // Sync the limiter to ensure clean state after override
         limiters[identifier].sync(WITHDRAWAL_PERIOD);
     }
 
     /**
-     * @dev Override the status of the limiter
+     * @notice Override the status of a specific limiter
+     * @dev Allows admin to disable rate limiting for a specific parameter
      * @param identifier The identifier of the limiter
-     * @param overrideStatus The status to override to
-     * @return The new status of the limiter
+     * @param overrideStatus The status to override to (true = bypass rate limits)
+     * @return The new override status of the limiter
      */
     function setLimiterOverriden(
         bytes32 identifier,
@@ -202,8 +229,13 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
             );
     }
 
+    /**
+     * @notice Override a rate limit after the cooldown period has elapsed
+     * @dev Anyone can call this once cooldown completes, allowing permissionless recovery from stale rate limits
+     */
     function overrideExpiredRateLimit() external {
         if (!isRateLimited) revert CircuitBreaker__NotRateLimited();
+        // Ensure sufficient time has passed since the rate limit was triggered
         if (block.timestamp - lastRateLimitTimestamp < rateLimitCooldownPeriod) {
             revert CircuitBreaker__CooldownPeriodNotReached();
         }
@@ -278,6 +310,16 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         limiter.sync(WITHDRAWAL_PERIOD);
     }
 
+    /**
+     * @notice Internal function to handle increases in security parameters (e.g., deposits)
+     * @dev Records the change and checks if limits are breached. Does NOT revert on trigger.
+     * @param identifier The identifier of the security parameter
+     * @param amount The amount by which to increase the parameter
+     * @param settlementTarget Target address for settlement module
+     * @param settlementValue Value to send in settlement
+     * @param settlementPayload Payload for settlement module
+     * @return bool True if circuit breaker was triggered, false otherwise
+     */
     function _increaseParameter(
         bytes32 identifier,
         uint256 amount,
@@ -285,14 +327,20 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         uint256 settlementValue,
         bytes memory settlementPayload
     ) internal onlyProtected onlyOperational returns (bool) {
-        /// @dev uint256 could overflow into negative
         Limiter storage limiter = limiters[identifier];
 
         emit ParameterInrease(amount, identifier);
+
+        // Record the liquidity increase in the limiter's tracking system
         limiter.recordChange(int256(amount), WITHDRAWAL_PERIOD, TICK_LENGTH);
+
+        // Check if this change triggered a rate limit (unless we're in grace period)
         if (limiter.status() == LimitStatus.Triggered && !isInGracePeriod()) {
             emit RateLimited(identifier);
             isRateLimited = true;
+            lastRateLimitTimestamp = block.timestamp;
+
+            // Invoke settlement module to handle the triggered state
             _onCircuitBreakerTrigger(
                 limiter,
                 settlementTarget,
@@ -304,6 +352,16 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         return false;
     }
 
+    /**
+     * @notice Internal function to handle decreases in security parameters (e.g., withdrawals)
+     * @dev Records the change and checks if limits are breached. Does NOT revert on trigger.
+     * @param identifier The identifier of the security parameter
+     * @param amount The amount by which to decrease the parameter
+     * @param settlementTarget Target address for settlement module
+     * @param settlementValue Value to send in settlement
+     * @param settlementPayload Payload for settlement module
+     * @return bool True if circuit breaker was triggered, false otherwise
+     */
     function _decreaseParameter(
         bytes32 identifier,
         uint256 amount,
@@ -312,19 +370,25 @@ contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
         bytes memory settlementPayload
     ) internal onlyProtected onlyOperational returns (bool) {
         Limiter storage limiter = limiters[identifier];
-        // Check if the token has enforced rate limited
+
+        // Check if this parameter has rate limiting configured
         if (!limiter.isInitialized()) {
-            // if it is not rate limited, just return false
+            // No rate limiting configured, allow the operation
             return false;
         }
 
         emit ParameterDecrease(amount, identifier);
+
+        // Record the liquidity decrease (negative value) in the limiter's tracking system
         limiter.recordChange(-int256(amount), WITHDRAWAL_PERIOD, TICK_LENGTH);
 
-        // Check if rate limit is triggered after withdrawal
+        // Check if this change triggered a rate limit (unless we're in grace period)
         if (limiter.status() == LimitStatus.Triggered && !isInGracePeriod()) {
             emit RateLimited(identifier);
             isRateLimited = true;
+            lastRateLimitTimestamp = block.timestamp;
+
+            // Invoke settlement module to handle the triggered state
             _onCircuitBreakerTrigger(
                 limiter,
                 settlementTarget,
