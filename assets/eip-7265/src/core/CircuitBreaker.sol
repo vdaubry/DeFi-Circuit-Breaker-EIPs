@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.19;
+pragma solidity ^0.8.19;
 
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
-import {ICircuitBreaker} from "../interfaces/ICircuitBreaker.sol";
+import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
+
+import {IERC7265CircuitBreaker} from "../interfaces/IERC7265CircuitBreaker.sol";
+import {ISettlementModule} from "../interfaces/ISettlementModule.sol";
+
 import {Limiter, LiqChangeNode} from "../static/Structs.sol";
 import {LimiterLib, LimitStatus} from "../utils/LimiterLib.sol";
 
-contract CircuitBreaker is ICircuitBreaker {
+contract CircuitBreaker is IERC7265CircuitBreaker, Ownable {
     using SafeERC20 for IERC20;
     using LimiterLib for Limiter;
 
@@ -15,8 +19,11 @@ contract CircuitBreaker is ICircuitBreaker {
     //                      STATE VARIABLES                       //
     ////////////////////////////////////////////////////////////////
 
-    mapping(address => Limiter limiter) public tokenLimiters;
+    mapping(bytes32 identifier => Limiter limiter) public limiters;
+    mapping(address _contract => bool protectionActive)
+        public isProtectedContract;
 
+<<<<<<< HEAD
     /**
      * @notice Funds locked if rate limited reached
      */
@@ -25,8 +32,13 @@ contract CircuitBreaker is ICircuitBreaker {
 
     mapping(address account => bool protectionActive)
         public isProtectedContract;
+=======
+    uint256 public immutable WITHDRAWAL_PERIOD;
 
-    address public admin;
+    uint256 public immutable TICK_LENGTH;
+>>>>>>> chore/limiter-lib-docs
+
+    bool public isOperational = true;
 
     bool public isRateLimited;
 
@@ -36,54 +48,25 @@ contract CircuitBreaker is ICircuitBreaker {
 
     uint256 public gracePeriodEndTimestamp;
 
-    // Using address(1) as a proxy for native token (ETH, BNB, etc), address(0) could be problematic
-    address public immutable NATIVE_ADDRESS_PROXY = address(1);
-
-    uint256 public immutable WITHDRAWAL_PERIOD;
-
-    uint256 public immutable TICK_LENGTH;
-
-    bool public isOperational = true;
-
-    ////////////////////////////////////////////////////////////////
-    //                           EVENTS                           //
-    ////////////////////////////////////////////////////////////////
-
-    /**
-     * @notice Non-EIP standard events
-     */
-
-    event TokenBacklogCleaned(address indexed token, uint256 timestamp);
-
     ////////////////////////////////////////////////////////////////
     //                           ERRORS                           //
     ////////////////////////////////////////////////////////////////
 
-    error NotAProtectedContract();
-    error NotAdmin();
-    error InvalidAdminAddress();
-    error NoLockedFunds();
-    error RateLimited();
-    error NotRateLimited();
-    error TokenNotRateLimited();
-    error CooldownPeriodNotReached();
-    error NativeTransferFailed();
-    error InvalidRecipientAddress();
-    error InvalidGracePeriodEnd();
-    error ProtocolWasExploited();
-    error NotExploited();
+    error CircuitBreaker__NotAProtectedContract();
+    error CircuitBreaker__NotOperational();
+    error CircuitBreaker__RateLimited();
+    error CircuitBreaker__NotRateLimited();
+    error CircuitBreaker__InvalidGracePeriodEnd();
+    error CircuitBreaker__CooldownPeriodNotReached();
 
     ////////////////////////////////////////////////////////////////
     //                         MODIFIERS                          //
     ////////////////////////////////////////////////////////////////
 
     modifier onlyProtected() {
-        if (!isProtectedContract[msg.sender]) revert NotAProtectedContract();
-        _;
-    }
-
-    modifier onlyAdmin() {
-        if (msg.sender != admin) revert NotAdmin();
+        if (!isProtectedContract[msg.sender]) {
+            revert CircuitBreaker__NotAProtectedContract();
+        }
         _;
     }
 
@@ -95,34 +78,24 @@ contract CircuitBreaker is ICircuitBreaker {
      * (Social Consensus)
      */
     modifier onlyOperational() {
-        if (!isOperational) revert ProtocolWasExploited();
+        if (!isOperational) revert CircuitBreaker__NotOperational();
         _;
     }
 
-    /**
-     * @notice gracePeriod refers to the time after a rate limit trigger and then overriden where withdrawals are
-     * still allowed.
-     * @dev For example a false positive rate limit trigger, then it is overriden, so withdrawals are still
-     * allowed for a period of time.
-     * Before the rate limit is enforced again, it should be set to be at least your largest
-     * withdrawalPeriod length
-     */
     constructor(
-        address _admin,
         uint256 _rateLimitCooldownPeriod,
-        uint256 _withdrawlPeriod,
-        uint256 _liquidityTickLength
-    ) {
-        admin = _admin;
+        uint256 _withdrawalPeriod,
+        uint256 _liquidityTickLength,
+        address _initialOwner
+    ) Ownable(_initialOwner) {
         rateLimitCooldownPeriod = _rateLimitCooldownPeriod;
-        WITHDRAWAL_PERIOD = _withdrawlPeriod;
+        WITHDRAWAL_PERIOD = _withdrawalPeriod;
         TICK_LENGTH = _liquidityTickLength;
     }
 
-    ////////////////////////////////////////////////////////////////
-    //                         FUNCTIONS                          //
-    ////////////////////////////////////////////////////////////////
+    /// @dev OWNER FUNCTIONS
 
+<<<<<<< HEAD
     /**
      * @dev Give protected contracts one function to call for convenience
      */
@@ -131,17 +104,27 @@ contract CircuitBreaker is ICircuitBreaker {
         uint256 _amount
     ) external onlyProtected onlyOperational {
         _onTokenInflow(_token, _amount);
+=======
+    /// @inheritdoc IERC7265CircuitBreaker
+    function addProtectedContracts(
+        address[] calldata _ProtectedContracts
+    ) external override onlyOwner {
+        for (uint256 i = 0; i < _ProtectedContracts.length; i++) {
+            isProtectedContract[_ProtectedContracts[i]] = true;
+        }
+>>>>>>> chore/limiter-lib-docs
     }
 
-    function onTokenOutflow(
-        address _token,
-        uint256 _amount,
-        address _recipient,
-        bool _revertOnRateLimit
-    ) external onlyProtected onlyOperational {
-        _onTokenOutflow(_token, _amount, _recipient, _revertOnRateLimit);
+    /// @inheritdoc IERC7265CircuitBreaker
+    function removeProtectedContracts(
+        address[] calldata _ProtectedContracts
+    ) external override onlyOwner {
+        for (uint256 i = 0; i < _ProtectedContracts.length; i++) {
+            isProtectedContract[_ProtectedContracts[i]] = false;
+        }
     }
 
+<<<<<<< HEAD
     function onNativeAssetInflow(
         uint256 _amount
     ) external onlyProtected onlyOperational {
@@ -158,26 +141,124 @@ contract CircuitBreaker is ICircuitBreaker {
             _recipient,
             _revertOnRateLimit
         );
+=======
+    /// @dev CORE CIRCUIT BREAKER FUNCTIONS
+
+    /// @inheritdoc IERC7265CircuitBreaker
+    function addSecurityParameter(
+        bytes32 identifier,
+        uint256 minLiqRetainedBps,
+        uint256 limitBeginThreshold,
+        address settlementModule
+    ) external override onlyOwner {
+        _addSecurityParameter(
+            identifier,
+            minLiqRetainedBps,
+            limitBeginThreshold,
+            settlementModule
+        );
+    }
+
+    /// @inheritdoc IERC7265CircuitBreaker
+    function updateSecurityParameter(
+        bytes32 identifier,
+        uint256 minLiqRetainedBps,
+        uint256 limitBeginThreshold,
+        address settlementModule
+    ) external override onlyOwner {
+        _updateSecurityParameter(
+            identifier,
+            minLiqRetainedBps,
+            limitBeginThreshold,
+            settlementModule
+        );
+    }
+
+    /// @inheritdoc IERC7265CircuitBreaker
+    function setCircuitBreakerOperationalStatus(
+        bool newOperationalStatus
+    ) external override onlyOwner {
+        isOperational = newOperationalStatus;
+    }
+
+    function startGracePeriod(uint256 _gracePeriodEndTimestamp) external onlyOwner {
+        if (_gracePeriodEndTimestamp <= block.timestamp) revert CircuitBreaker__InvalidGracePeriodEnd();
+        gracePeriodEndTimestamp = _gracePeriodEndTimestamp;
+        emit GracePeriodStarted(_gracePeriodEndTimestamp);
+    }
+
+    function overrideRateLimit(bytes32 identifier) external onlyOwner {
+        if (!isRateLimited) revert CircuitBreaker__NotRateLimited();
+        isRateLimited = false;
+        limiters[identifier].sync(WITHDRAWAL_PERIOD);
+>>>>>>> chore/limiter-lib-docs
     }
 
     /**
-     * @notice Allow users to claim locked funds when rate limit is resolved
-     * use address(1) for native token claims
+     * @dev Override the status of the limiter
+     * @param identifier The identifier of the limiter
+     * @param overrideStatus The status to override to
+     * @return The new status of the limiter
      */
+    function setLimiterOverriden(
+        bytes32 identifier,
+        bool overrideStatus
+    ) external returns (bool) {
+        return limiters[identifier].overriden = overrideStatus;
+    }
 
+<<<<<<< HEAD
     function claimLockedFunds(
         address _asset,
         address _recipient
     ) external onlyOperational {
         if (lockedFunds[_recipient][_asset] == 0) revert NoLockedFunds();
         if (isRateLimited) revert RateLimited();
+=======
+    /// @inheritdoc IERC7265CircuitBreaker
+    function increaseParameter(
+        bytes32 identifier,
+        uint256 amount,
+        address settlementTarget,
+        uint256 settlementValue,
+        bytes memory settlementPayload
+    ) external override returns (bool) {
+        return
+            _increaseParameter(
+                identifier,
+                amount,
+                settlementTarget,
+                settlementValue,
+                settlementPayload
+            );
+    }
+>>>>>>> chore/limiter-lib-docs
 
-        uint256 amount = lockedFunds[_recipient][_asset];
-        lockedFunds[_recipient][_asset] = 0;
+    /// @inheritdoc IERC7265CircuitBreaker
+    function decreaseParameter(
+        bytes32 identifier,
+        uint256 amount,
+        address settlementTarget,
+        uint256 settlementValue,
+        bytes memory settlementPayload
+    ) external override returns (bool) {
+        return
+            _decreaseParameter(
+                identifier,
+                amount,
+                settlementTarget,
+                settlementValue,
+                settlementPayload
+            );
+    }
 
-        emit LockedFundsClaimed(_asset, _recipient);
+    function overrideExpiredRateLimit() external {
+        if (!isRateLimited) revert CircuitBreaker__NotRateLimited();
+        if (block.timestamp - lastRateLimitTimestamp < rateLimitCooldownPeriod) {
+            revert CircuitBreaker__CooldownPeriodNotReached();
+        }
 
-        _safeTransferIncludingNative(_asset, _recipient, amount);
+        isRateLimited = false;
     }
 
     /**
@@ -185,11 +266,11 @@ contract CircuitBreaker is ICircuitBreaker {
      * it is better to clear the backlog in advance to save gas for the users
      * this is a public function so that anyone can call it as it is not user sensitive
      */
-    function clearBackLog(address _token, uint256 _maxIterations) external {
-        tokenLimiters[_token].sync(WITHDRAWAL_PERIOD, _maxIterations);
-        emit TokenBacklogCleaned(_token, block.timestamp);
+    function clearBackLog(bytes32 identifier, uint256 _maxIterations) external {
+        limiters[identifier].sync(WITHDRAWAL_PERIOD, _maxIterations);
     }
 
+<<<<<<< HEAD
     function overrideExpiredRateLimit() external {
         if (!isRateLimited) revert NotRateLimited();
         if (
@@ -272,16 +353,30 @@ contract CircuitBreaker is ICircuitBreaker {
 
     function isRateLimitTriggered(address _asset) public view returns (bool) {
         return tokenLimiters[_asset].status() == LimitStatus.Triggered;
+=======
+    /// @dev EXTERNAL VIEW FUNCTIONS
+
+    function isParameterRateLimited(bytes32 identifier) external view returns (bool) {
+        return limiters[identifier].status() == LimitStatus.Triggered;
+>>>>>>> chore/limiter-lib-docs
     }
 
     function isInGracePeriod() public view returns (bool) {
         return block.timestamp <= gracePeriodEndTimestamp;
     }
 
-    function markAsNotOperational() external onlyAdmin {
-        isOperational = false;
+    function liquidityChanges(
+        bytes32 identifier,
+        uint256 _tickTimestamp
+    ) external view returns (uint256 nextTimestamp, int256 amount) {
+        LiqChangeNode storage node = limiters[identifier].listNodes[
+            _tickTimestamp
+        ];
+        nextTimestamp = node.nextTimestamp;
+        amount = node.amount;
     }
 
+<<<<<<< HEAD
     function migrateFundsAfterExploit(
         address[] calldata _assets,
         address _recoveryRecipient
@@ -308,66 +403,72 @@ contract CircuitBreaker is ICircuitBreaker {
                 }
             }
         }
-    }
+=======
+    /// @dev INTERNAL FUNCTIONS
 
-    ////////////////////////////////////////////////////////////////
-    //                       INTERNAL  FUNCTIONS                  //
-    ////////////////////////////////////////////////////////////////
-
-    function _onTokenInflow(address _token, uint256 _amount) internal {
-        /// @dev uint256 could overflow into negative
-        Limiter storage limiter = tokenLimiters[_token];
-
-        limiter.recordChange(int256(_amount), WITHDRAWAL_PERIOD, TICK_LENGTH);
-        emit AssetInflow(_token, _amount);
-    }
-
-    function _onTokenOutflow(
-        address _token,
-        uint256 _amount,
-        address _recipient,
-        bool _revertOnRateLimit
+    function _addSecurityParameter(
+        bytes32 identifier,
+        uint256 minValBps,
+        uint256 limitBeginThreshold,
+        address settlementModule
     ) internal {
-        Limiter storage limiter = tokenLimiters[_token];
-        // Check if the token has enforced rate limited
-        if (!limiter.initialized()) {
-            // if it is not rate limited, just transfer the tokens
-            _safeTransferIncludingNative(_token, _recipient, _amount);
-            return;
-        }
-        limiter.recordChange(-int256(_amount), WITHDRAWAL_PERIOD, TICK_LENGTH);
-        // Check if currently rate limited, if so, add to locked funds claimable when resolved
-        if (isRateLimited) {
-            if (_revertOnRateLimit) {
-                revert RateLimited();
-            }
-            lockedFunds[_recipient][_token] += _amount;
-            return;
-        }
-
-        // Check if rate limit is triggered after withdrawal and not in grace period
-        // (grace period allows for withdrawals to be made if rate limit is triggered but overriden)
-        if (limiter.status() == LimitStatus.Triggered && !isInGracePeriod()) {
-            if (_revertOnRateLimit) {
-                revert RateLimited();
-            }
-            // if it is, set rate limited to true
-            isRateLimited = true;
-            lastRateLimitTimestamp = block.timestamp;
-            // add to locked funds claimable when resolved
-            lockedFunds[_recipient][_token] += _amount;
-
-            emit AssetRateLimitBreached(_token, block.timestamp);
-
-            return;
-        }
-
-        // if everything is good, transfer the tokens
-        _safeTransferIncludingNative(_token, _recipient, _amount);
-
-        emit AssetWithdraw(_token, _recipient, _amount);
+        Limiter storage limiter = limiters[identifier];
+        limiter.init(
+            minValBps,
+            limitBeginThreshold,
+            ISettlementModule(settlementModule)
+        );
+        emit SecurityParameterAdded(
+            identifier,
+            minValBps,
+            limitBeginThreshold,
+            settlementModule
+        );
+>>>>>>> chore/limiter-lib-docs
     }
 
+    function _updateSecurityParameter(
+        bytes32 identifier,
+        uint256 minValBps,
+        uint256 limitBeginThreshold,
+        address settlementModule
+    ) internal {
+        Limiter storage limiter = limiters[identifier];
+        limiter.updateParams(
+            minValBps,
+            limitBeginThreshold,
+            ISettlementModule(settlementModule)
+        );
+        limiter.sync(WITHDRAWAL_PERIOD);
+    }
+
+    function _increaseParameter(
+        bytes32 identifier,
+        uint256 amount,
+        address settlementTarget,
+        uint256 settlementValue,
+        bytes memory settlementPayload
+    ) internal onlyProtected onlyOperational returns (bool) {
+        /// @dev uint256 could overflow into negative
+        Limiter storage limiter = limiters[identifier];
+
+        emit ParameterInrease(amount, identifier);
+        limiter.recordChange(int256(amount), WITHDRAWAL_PERIOD, TICK_LENGTH);
+        if (limiter.status() == LimitStatus.Triggered && !isInGracePeriod()) {
+            emit RateLimited(identifier);
+            isRateLimited = true;
+            _onCircuitBreakerTrigger(
+                limiter,
+                settlementTarget,
+                settlementValue,
+                settlementPayload
+            );
+            return true;
+        }
+        return false;
+    }
+
+<<<<<<< HEAD
     function _safeTransferIncludingNative(
         address _token,
         address _recipient,
@@ -380,6 +481,50 @@ contract CircuitBreaker is ICircuitBreaker {
             } else {
                 IERC20(_token).safeTransfer(_recipient, _amount);
             }
+=======
+    function _decreaseParameter(
+        bytes32 identifier,
+        uint256 amount,
+        address settlementTarget,
+        uint256 settlementValue,
+        bytes memory settlementPayload
+    ) internal onlyProtected onlyOperational returns (bool) {
+        Limiter storage limiter = limiters[identifier];
+        // Check if the token has enforced rate limited
+        if (!limiter.isInitialized()) {
+            // if it is not rate limited, just return false
+            return false;
+>>>>>>> chore/limiter-lib-docs
         }
+
+        emit ParameterDecrease(amount, identifier);
+        limiter.recordChange(-int256(amount), WITHDRAWAL_PERIOD, TICK_LENGTH);
+
+        // Check if rate limit is triggered after withdrawal
+        if (limiter.status() == LimitStatus.Triggered && !isInGracePeriod()) {
+            emit RateLimited(identifier);
+            isRateLimited = true;
+            _onCircuitBreakerTrigger(
+                limiter,
+                settlementTarget,
+                settlementValue,
+                settlementPayload
+            );
+            return true;
+        }
+        return false;
+    }
+
+    function _onCircuitBreakerTrigger(
+        Limiter storage limiter,
+        address settlementTarget,
+        uint256 settlementValue,
+        bytes memory settlementPayload
+    ) internal virtual {
+        limiter.settlementModule.prevent{value: settlementValue}(
+            settlementTarget,
+            settlementValue,
+            settlementPayload
+        );
     }
 }
